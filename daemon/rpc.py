@@ -104,10 +104,27 @@ class ServersQuery (RpcResource) :
 
 class ServerInfoQuery (RpcResource) :
     def render_RPC (self, request, id) :
-        self.main.servers[int(id)].getServerDetails().addCallback(self._gotDetails, request)
+        self.main.servers[int(id)].getServerDetails().addCallback(self._gotDetails, request).addErrback(self.failure, request)
 
     def _gotDetails (self, res, request) :
         reply(request, 'server_info', res)
+
+class SaveGameQuery (RpcResource) :
+    def render_RPC (self, r, id) :
+        self.main.servers[int(id)].saveGame().addCallback(self._done, r).addErrback(self.failure, r)
+
+    def _done (self, res, r) :
+        reply(r, 'save_game', res)
+
+class LoadGameQuery (RpcResource) :
+    def render_RPC (self, r, id, game, save=None) :
+        id = int(id)
+        game = int(game)
+
+        self.main.servers[id].loadGame(game, save).addCallback(self._done, r).addErrback(self.failure, r)
+
+    def _done (self, res, r) :
+        reply(r, 'load_game', res)
 
 class DebugQuery (RpcResource) :
     def render_RPC (self, request) :
@@ -125,6 +142,8 @@ class Site (server.Site) :
         root.putChild('debug', DebugQuery(main))
         root.putChild('servers', ServersQuery(main))
         root.putChild('server_info', ServerInfoQuery(main))
+        root.putChild('save_game', SaveGameQuery(main))
+        root.putChild('load_game', LoadGameQuery(main))
 
         server.Site.__init__(self, root)
 

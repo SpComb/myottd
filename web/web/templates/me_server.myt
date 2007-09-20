@@ -4,9 +4,9 @@
 
     <form action="<% h.url_for('me_server_edit', id=c.server_id) %>" method="POST">
         <label for="name">Name</label>
-        <input type="text" name="name" value="<% c.server_name %>"/>
-% if c.server_config_stale :
-            <span class="current">"<% c.server_info['server_name'] %>"</span>
+        <input type="text" name="name" value="<% c.server_name | h %>"/>
+% if c.server_config_stale and c.server_info :
+            <span class="current">"<% c.server_info['server_name'] | h %>"</span>
 % # end if
         <br />
 
@@ -14,7 +14,7 @@
         <select name="version">
             <% h.options_for_select(c.available_versions, c.server_version_id) %>
         </select>
-% if c.server_config_stale :
+% if c.server_config_stale and c.server_info :
             <span class="current">"<% c.server_info['version'] %>"</span>
 % # end if
         <br/>
@@ -29,8 +29,8 @@ checked="checked" \
 
         <label for="password">Password</label>
         <input type="text" name="password" value="<% c.server_password | h %>" />
-% if c.server_config_stale :
-            <span class="current">"<% c.server_info['password'] %>"</span>
+% if c.server_config_stale and c.server_info :
+            <span class="current">"<% c.server_info['password'] | h %>"</span>
 % # end if
         <br/>
 
@@ -71,16 +71,16 @@ checked="checked" \
     <form action="<% h.url_for('me_server_newrandom', id=c.server_id) %>" method="POST">
         <label for="climate">Climate</label>
         <select name="climate">
-            <% h.options_for_select(('normal', 'desert', 'hilly', 'candy'), c.server_info['climate']) %>
+            <% h.options_for_select(h.climate_opts, c.server_info.get('climate', None)) %>
         </select>
         <br/>
 
 % map_geom_opts = [(2**x, x) for x in xrange(6, 11)]
         <label for="map_x map_y">Map Size</label>
         <select name="map_x" class="thin">
-            <% h.options_for_select(map_geom_opts, c.server_info['map_x']) %>
+            <% h.options_for_select(map_geom_opts, c.server_info.get('map_x', None)) %>
         </select> x <select name="map_y" class="thin">
-            <% h.options_for_select(map_geom_opts, c.server_info['map_y']) %>
+            <% h.options_for_select(map_geom_opts, c.server_info.get('map_y', None)) %>
         </select>
         <br/>
 
@@ -88,5 +88,59 @@ checked="checked" \
         <br/>
     </form>
 </fieldset>
+
+% s = c.server_info
+% if s :
+%   cur_game_id = str(s['game_id'])
+%   cur_save_ds = s['save_date']
+<fieldset>
+    <legend>Savegames</legend>
+    
+    <form action="<% h.url_for('me_server_savegames', id=c.server_id) %>" method="POST">
+        <input type="submit" name="save" value="Save" />
+        <br/>
+
+    <table class="savegames">
+        <tr>
+            <th>Game</th>
+            <th>Savegame</th>
+            <th>Action</th>
+        </tr>
+%   for game_id, saves in s['games'].iteritems() :
+        <tr>
+%       if game_id == cur_game_id :
+            <th rowspan="<% len(saves) + 1 %>" id="current_game">
+%       else :
+            <th rowspan="<% len(saves) + 1 %>">
+%       # end if        
+                Game <% game_id %>
+            </th>
+<!--            
+            <td><input type="submit" name="continue_<% game_id %>" value="Continue" /></td>
+            <td>&nbsp;</td>
+-->
+        </tr>
+%       for save_ds in saves :
+%           if game_id == cur_game_id and save_ds == cur_save_ds :
+        <tr id="current_save">
+%           else :
+        <tr>
+%           # end if        
+            <td><% h.fmtDatestamp(save_ds) %></td>
+            <td>
+%           if game_id == cur_game_id and save_ds == cur_save_ds :
+                &nbsp;
+%           else :
+                <input type="submit" name="load_<% game_id %>_<% save_ds %>" value="Load" />
+%           # end if                        
+            </td>
+        </tr>
+%       # end if
+%   # end if
+    </table>
+
+    </form>
+</fieldset>
+% # end if
 
 <& server_info.myt &>

@@ -1,6 +1,13 @@
 from web.lib.base import *
 
+def validate (id) :
+     if c.user and id and model.Server.get_by(id=id).owner != c.user.id :
+        raise Exception("server's not yours")
+
 class MeController (BaseController) :
+#    def __before__ (self) :
+#        super(MeController, self).__before__()
+
     def index (self) :
        c.user_servers = model.user_servers(c.user.id)
        c.available_versions = model.available_versions()
@@ -13,14 +20,16 @@ class MeController (BaseController) :
         h.redirect_to('me_server', id=s.id)
     
     def server (self, id) :
+        validate(id)
         c.server_id = id
         c.server_name, c.owner_name, c.server_port, c.server_status, c.server_version, c.server_version_id, c.server_config_stale, c.server_password = model.server_info(id)
-        c.server_info = rpc.invoke('server_info', id=id)
+        c.server_info = rpc.server_info(id)
         c.available_versions = model.available_versions()
         
         return render_response('me_server.myt')
     
     def server_edit (self, id) :
+        validate(id)
         action = request.params['action']
 
         if action == 'Stop' :
@@ -42,6 +51,7 @@ class MeController (BaseController) :
         h.redirect_to('me_server', id=id)
     
     def new_random (self, id) :
+        validate(id)
         opts = {}
 
         for k in ('climate', 'map_x', 'map_y') :
@@ -51,4 +61,18 @@ class MeController (BaseController) :
 
         h.redirect_to('me_server', id=id)
 
+    def savegames (self, id) :
+        if request.params.get('save', False) :
+            rpc.invoke('save_game', id=id)
+
+        else :
+            for name in request.params.iterkeys() :
+                if name.startswith('load_') :
+                    _, game_id, save_id = name.split('_')
+                    game_id = int(game_id)
+                    save_id = int(save_id)
+
+                    rpc.invoke('load_game', id=id, game=game_id, save=save_id)
+        
+        h.redirect_to('me_server', id=id)
 

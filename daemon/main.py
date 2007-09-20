@@ -34,6 +34,21 @@ def ignoreResult (callable) :
 
     return _wrap
 
+def game_id (fname) :
+    if fname.startswith('game_') :
+        return int(fname.split('_')[1])
+        
+    else :
+        return None
+
+def save_date (fname) :
+    fname, ext = os.path.splitext(fname)
+
+    if fname.startswith('save_') :
+        return fname.split('_')[1]
+    else :
+        return None
+
 class Delay (defer.Deferred) :
     def __init__ (self, delay, what=None) :
         self._timer = reactor.callLater(delay, self.callback, what)
@@ -46,6 +61,10 @@ class Openttd (protocol.ProcessProtocol) :
         self.id = id
         self.startup = None
         self.running = False
+
+        self.game_id = None
+        self.save_date = None
+        self.random_map = None
         
         self.out_queue = []
         self.out_wait = False
@@ -87,7 +106,7 @@ class Openttd (protocol.ProcessProtocol) :
     def log (self, msg) :
         print '%d: %s' % (self.id, msg)
 
-    def start (self, opts=None, _fetchDb=True) :
+    def start (self, opts={}, _fetchDb=True) :
         """
             Prepare the environment and start the openttd server
         """
@@ -95,30 +114,53 @@ class Openttd (protocol.ProcessProtocol) :
         assert not self.running and not self.startup
 
         self.startup = defer.Deferred()
+        self.game_id = self.save_date = None
+
+        savegame = opts.pop('savegame', None)
+        
+        autosave_path = "%s/save/auto.sav" % self.path
+        game_id_path = "%s/save/game_id.txt" % self.path
+
+        if not savegame and os.path.exists(autosave_path) :
+            if os.path.exists(game_id_path) :
+                self.log("found game_id.txt")
+                fh = open(game_id_path, 'r')
+                self.game_id = int(fh.read())
+                self.save_date = "auto"
+
+            self.log("resuming autosave with game_id=%s" % self.game_id)
+            savegame = autosave_path
+
+        self.random_map = not bool(savegame)
 
         if opts :
             self._setGameStuff(**opts)
         
         if _fetchDb :
-            db.query(SERVER_QUERY_BASE + " AND s.id=%s", self.id).addCallback(self._gotServerSettings)
+            db.query(SERVER_QUERY_BASE + " AND s.id=%s", self.id).addCallback(self._gotServerSettings, savegame)
         else :
-            self._start2()
+            self._start2(savegame)
 
         return self.startup
 
-    def _gotServerSettings (self, res) :
+    def _gotServerSettings (self, res, savegame) :
         row = res[0]
 
         self._setStuff(*(row[1:]))  # chop off the id column
 
-        self._start2()
+        self._start2(savegame)
 
-    def _start2 (self) :
+    def _start2 (self, savegame=None) :
         self.checkFilesystem()
         self.updateConfig()
+
+        args = ['openttd', '-D']
         
-        self.log("starting openttd...")
-        reactor.spawnProcess(self, '%s/openttd' % self.path, args=('openttd', '-D'), path=self.path, usePTY=True)
+        if savegame :
+            args.extend(['-g', savegame])
+        
+        self.log("starting openttd... with args: ./%s" % " ".join(args))
+        reactor.spawnProcess(self, '%s/openttd' % self.path, args=args, path=self.path, usePTY=True)
 
     def applyConfig (self, *stuff) :
         """
@@ -263,6 +305,9 @@ class Openttd (protocol.ProcessProtocol) :
             Run the given command on the console and return a deferred that callbacks with a list of the reply lines
         """
 
+        if not self.running :
+            raise Exception("not running")
+
         # escape the arguments as needed
         args2 = []
         for arg in args :
@@ -318,15 +363,76 @@ class Openttd (protocol.ProcessProtocol) :
 
         if self.cmd_deferred :
             self._cmdOver()
-   
+    
+    # cd command
+    def cmdCd (self, dir) :
+        self.log("changing to directory %s" % dir)
+
+        return self.command('cd', dir).addCallback(self._cmdCd_ok)
+
+    def _cmdCd_ok (self, lines) :
+        for line in lines :
+            if line.endswith("No such file or directory.") :
+                raise Exception("No such directory")
+
+        return None
+
+    # save command
+    def cmdSave (self, filename) :
+        self.log("saving to %s" % filename)
+
+        return self.command('save', filename).addCallback(self._cmdSave_ok)
+
+    def _cmdSave_ok (self, lines) :
+        path = None
+
+        for line in lines :
+            if line.startswith("Map sucessfully saved to") :
+                path = line.split(' ')[-1]
+
+        if path :
+            return path
+        else :
+            raise Exception("Save failed: %s" % lines)
+
+    # load command
+    def cmdLoad (self, filename) :
+        self.log("loading savegame %s" % filename)
+
+        return self.command('load', filename).addCallback(self._cmdLoad_ok)
+
+    def _cmdLoad_ok (self, lines) :
+        for line in lines :
+            if line.endswith("No such file or directory.") :
+                raise Exception("No such savegame")
+            elif line.endswith("Cannot read savegame header, aborting.") :
+                raise Exception("Corrupt savegame")
+        
+        # we can only assume...
+        return None
+
+    # stop command
     def stop (self) :
         self.log("stopping...")
 
-        return self.command('quit').addCallback(self._waitStop)
+        return self.cmdSave('auto').addCallback(self._doStop_saved)
+
+    def _doStop_saved (self, res) :
+        game_id_path = "%s/save/game_id.txt" % self.path
+
+        if self.game_id :
+            fh = open(game_id_path, 'w')
+            fh.write(str(self.game_id))
+            fh.close()
+        elif os.path.exists(game_id_path) :
+            os.unlink(game_id_path)
+
+        return self.command('quit')
 
     def _waitStop (self, ret) :
         return Delay(2)
-
+        
+    # restart (stop + start)
     def restart (self, opts=None) :
         if self.running :
             self.log("restarting...")
@@ -340,6 +446,7 @@ class Openttd (protocol.ProcessProtocol) :
     def _doRestart_stopped (self, res, opts) :
         self.start(opts)
 
+    # server_info command
     def queryServerInfo (self) :
         return self.command('server_info').addCallback(self._gotServerInfo)
 
@@ -368,8 +475,9 @@ class Openttd (protocol.ProcessProtocol) :
         self.log("server_info: clients=%d/%d, companies=%d/%d, spectators=%d/%d" % (cur_clients, max_clients, cur_companies, max_companies, cur_spectators, max_spectators))
 
         return cur_clients, max_clients, cur_companies, max_companies, cur_spectators, max_spectators
-
-    def getDate (self) :
+    
+    # getdate command
+    def cmdGetdate (self) :
         return self.command('getdate').addCallback(self._gotDate)
 
     def _gotDate (self, lines) :
@@ -377,10 +485,11 @@ class Openttd (protocol.ProcessProtocol) :
             if line.startswith('Date:') :
                 _ign, date = line.split(': ', 1)
                 d, m, y = date.split('-')
-                return date(year=y, month=m, day=d)
+                return "%04d%02d%02d" % (int(y), int(m), int(d))
 
         return None
-
+    
+    # players command
     def getPlayers (self) :
         return self.command('players').addCallback(self._gotPlayers)
 
@@ -432,7 +541,8 @@ class Openttd (protocol.ProcessProtocol) :
                 ))
         
         return clients
-
+    
+    # RPC: short overview
     def getServerOverview (self) :
         d = dict(
             id=self.id,
@@ -447,6 +557,9 @@ class Openttd (protocol.ProcessProtocol) :
             map_x=self.map_x,
             map_y=self.map_y,
             password=self.password,
+            game_id=self.game_id,
+            save_date=self.save_date,
+            is_random_map=self.random_map,
         )
 
         if self.running :
@@ -458,11 +571,20 @@ class Openttd (protocol.ProcessProtocol) :
         d['cur_clients'], d['max_clients'], d['cur_companies'], d['max_companies'], d['cur_spectators'], d['max_spectators'] = server_info
 
         return d
-
+    
+    # RPC: more details
     def getServerDetails (self) :
         return self.getServerOverview().addCallback(self._serverDetails_gotOverview)
 
     def _serverDetails_gotOverview (self, d) :
+        if self.running :
+            return self.cmdGetdate().addCallback(self._serverDetails_gotDate, d)
+        else :
+            return d
+
+    def _serverDetails_gotDate (self, date, d) :
+        d['cur_date'] = date
+
         return self.getPlayers().addCallback(self._serverDetails_gotPlayers, d)
 
     def _serverDetails_gotPlayers (self, players, d) :
@@ -485,8 +607,123 @@ class Openttd (protocol.ProcessProtocol) :
                 spectators.append(client)
             else :
                 companies[client['company']]['players'].append(client)
+            
+        # savegames
+        d['games'] = {}
+
+        for dirpath, dirnames, filenames in os.walk("%s/save" % self.path) :
+            head, tail = os.path.split(dirpath.rstrip('/'))
+
+            g_id = game_id(tail)
+
+            if g_id :
+                g = d['games'][g_id] = []
+                
+                for fname in filenames :
+                    s_date = save_date(fname)
+
+                    if s_date :
+                        g.append(s_date)
+
+                g.sort()
 
         return d
+
+    # Game-based perspective
+    def _getNewestSave (self, game_id) :
+        """
+            Returns an (date, dir, fname) tuple
+        """
+
+        files = []
+
+        for filename in os.listdir(savedir_path) :
+            if filename.startswith('save_') :
+                s_date = save_date(filename)
+
+                files.append((s_date, savedir, filename))
+
+        if files :
+            files.sort(reverse=True)
+            
+            return files[0]
+        else :
+            return "", "", ""
+
+    def saveGame (self) :
+        """
+            Save the current game
+        """
+
+        if self.game_id :
+            return self._doSaveGame_gotId(self.game_id)
+        else :
+            self.log("inserting new game")
+            return db.insertForID("games_id_seq", "INSERT INTO games (server) VALUES (%s)", self.id).addCallback(self._doSaveGame_gotId).addErrback(failure)
+
+    def _doSaveGame_gotId (self, game_id) :
+        self.game_id = game_id
+        
+        # check that the dir exists
+        savedir_path = "%s/save/game_%d" % (self.path, game_id)
+
+        if not os.path.exists(savedir_path) :
+            self.log("save dir %s does not exist, creating" % savedir_path)
+            os.mkdir(savedir_path)
+
+        return self.cmdGetdate().addCallback(self._doSaveGame_gotDate, game_id)
+
+    def _doSaveGame_gotDate (self, date, game_id) :
+        new_save_path = "game_%d/save_%s" % (game_id, date)
+        
+        self.log("saving game_id=%s, date=%s" % (game_id, date))
+
+        return self.cmdSave(new_save_path).addCallback(self._doSaveGame_saved, game_id, date)
+
+    def _doSaveGame_saved (self, res, game_id, date) :
+        self.save_date = date
+
+        return dict(game_id=game_id, save_date=date)
+
+    def loadGame (self, game_id, save_date=None) :
+        """
+            Continue the given game, loading either the given savegame, or the newest one
+        """
+        
+        if not save_date :
+            save_date, save_dir, save_fname = self._getNewestSave(game_id)
+        else :
+            save_dir = "game_%d" % game_id
+            save_fname = "save_%s.sav" % save_date
+            
+        if self.running :
+            self.log("loading game_id=%d, save_date=%s from %s as %s" % (game_id, save_date, save_dir, save_fname))
+
+            return self.cmdCd(save_dir).addCallback(self._doLoadGame_inDir, game_id, save_date, save_fname)
+        else :
+            self.log("not running yet, so starting up with savegame at %s" % save_path)
+
+            return self.start(opts={'savegame': "%s/%s/%s" % (self.path, save_dir, save_fname)}).addCallback(self._doLoadGame_started, game_id, save_date)
+
+    def _doLoadGame_started (self, res, game_id, save_date) :
+        self.game_id = game_id
+        self.save_date = save_date
+        self.random_map = False
+
+        return dict(game_id=game_id, save_date=save_date)
+    
+    def _doLoadGame_inDir (self, res, game_id, save_date, save_fname) :
+        return self.cmdLoad(save_fname).addCallback(self._doLoadGame_loaded, game_id, save_date)
+
+    def _doLoadGame_loaded (self, res, game_id, save_date) :
+        self.game_id = game_id
+        self.save_date = save_date
+        self.random_map = False
+
+        return self.cmdCd("..").addCallback(self._doLoadGame_done, dict(game_id=game_id, save_date=save_date))
+
+    def _doLoadGame_done (self, res, ret) :
+        return ret
 
 def failure (failure) :
     print 'FAILURE: %s' % failure
@@ -501,7 +738,7 @@ class ServerManager (object) :
 
         db.query(SERVER_QUERY_BASE).addCallback(self._gotServers).addErrback(failure)
 
-    def _startServer (self, row, opts=None) :
+    def _startServer (self, row, opts={}) :
         id = row[0]
         s = self.servers[id] = Openttd(self, *row)
         return s.start(_fetchDb=False, opts=opts)
@@ -535,16 +772,28 @@ class ServerManager (object) :
     def stopServer (self, id) :
         return self.servers[id].stop()
 
-    def restartServer (self, id, opts=None) :
+    def restartServer (self, id, opts={}) :
         return self.servers[id].restart(opts)
+
+    def shutdown (self) :
+        d = []
+
+        for server in self.servers.itervalues() :
+            if server.running :
+                d.append(server.stop())
+
+        return defer.DeferredList(d)
 
 def main () :
     db.execute("UPDATE servers SET status='offline'")
     
     main = ServerManager()
+    
+    reactor.addSystemEventTrigger("before", "shutdown", main.shutdown)
 
 if __name__ == '__main__' :
     print "Startup"
+
     reactor.callWhenRunning(main)
     reactor.run()
 

@@ -66,7 +66,11 @@ class ConnectionPool (adbapi.ConnectionPool) :
             
             This is meant to be used for queries that return results, like SELECT
         """
-        return self.runQuery(sql, params)     
+        
+        if params :
+            return self.runQuery(sql, params)     
+        else :
+            return self.runQuery(sql)
 
     def execute (self, sql, params=None) :
         """
@@ -76,6 +80,15 @@ class ConnectionPool (adbapi.ConnectionPool) :
         """
         
         return self.runOperation(sql, params)
+
+    def insertForID (self, id_seq, sql, params=None) :
+        return self.execute(sql, params).addCallback(self._didInsert, id_seq)
+
+    def _didInsert (self, res, id_seq) :
+        return self.query("SELECT last_value FROM %s" % id_seq).addCallback(self._gotID)
+    
+    def _gotID (self, res) :
+        return res[0][0]
 
 cp = ConnectionPool()
 
@@ -87,4 +100,5 @@ def logthru (func) :
 
 query = logthru(cp.query)
 execute = logthru(cp.execute)
+insertForID = cp.insertForID
 

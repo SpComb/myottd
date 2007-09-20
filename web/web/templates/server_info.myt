@@ -1,4 +1,6 @@
 % s = c.server_info
+
+% if s :
 <h1>Info on server <% s['server_name'] %></h1>
 
 <table class="info_table">
@@ -8,7 +10,7 @@
     </tr>
     <tr>
         <th>Server name</th>
-        <td>MyOTTD - <% s['owner'] %> - <% s['server_name'] %></td>
+        <td>MyOTTD - <% s['owner'] | h %> - <% s['server_name'] | h %></td>
     </tr>
     <tr>
         <th>Connection info</th>
@@ -21,22 +23,22 @@
     <tr>
         <th>Status</th>
         <td>
-% if s['running'] :
+%   if s['running'] :
             Running
-% # end if
+%   # end if
         </td>
     </tr>
     <tr>
         <th>Password</th>
         <td>
-% if s['has_password'] :
+%   if s['has_password'] :
             <strong>Yes</strong>
-% else :
+%   else :
             No
-% # end if
+%   # end if
         </td>
     </tr>
-% if s['running'] :    
+%   if s['running'] :    
     <tr>
         <th>Clients</th>
         <td>
@@ -56,6 +58,13 @@
         </td>
     </tr>
     <tr>
+        <th>Game Type</th>
+        <td>
+%       if s['is_random_map'] :
+            Random map
+        </td>
+    </tr>
+    <tr>
         <th>Climate</th>
         <td>
             <% h.climateName(s['climate']) %>    
@@ -66,10 +75,24 @@
         <td>
             <% h.mapSize(s['map_x']) %> x <% h.mapSize(s['map_y']) %>
         </td>
-    </tr>   
-% # end if
+    </tr>
+%       else :
+            Savegame
+        </td>
+    </tr>
+    <tr>
+        <th>Savegame</th>
+        <td>Game <% s['game_id'] %> - <% h.fmtDatestamp(s['save_date']) %></td>
+    </tr>
+%       # end if
+    <tr>
+        <th>Current Date</th>
+        <td><% h.fmtDatestamp(s['cur_date']) %></td>
+    </tr>
+%   # end if
 </table>
 
+%   if s['running'] :    
 <h1>Company List</h1>
 <table border="1">
     <tr>
@@ -82,10 +105,10 @@
         <th>Inagurated</th>
         <th>Vehicle Fleet</th>
     </tr>
-% for c in s['companies'] :
+%       for c in s['companies'] :
     <tr>
         <td><% c['pid'] %></td>
-        <td><% c['company_name'] %></td>
+        <td><% c['company_name'] | h %></td>
         <td><% c['color'] %></td>
         <td><% c['money'] %></td>
         <td><% c['loan'] %></td>
@@ -93,15 +116,15 @@
         <td><% c['year_founded'] %></td>
         <td>T:<% c['trains'] %>, R:<% c['road_vehicles'] %>, P:<% c['planes'] %>, S:<% c['ships'] %></td>
     </tr>
-%   for p in c['players'] :
+%               for p in c['players'] :
     <tr>
         <td colspan="2"></td>
         <td><% p['cid'] %></td>
-        <td colspan="4"><% p['name'] %></td>
+        <td colspan="4"><% p['name'] | h %></td>
         <td></td>
     </tr>
-%   # end for
-% # end for
+%               # end for
+%       # end for
     <tr>
         <th colspan="2">Players:</th>
         <th>ID#</th>
@@ -109,4 +132,9 @@
         <td></td>
     </tr>
 </table>
+
+%   # end if
+% else :
+<h1>Server offline</h1>
+% # end if
 
