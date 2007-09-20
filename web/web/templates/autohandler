@@ -1,0 +1,41 @@
+<html>
+    <head>
+        <title>MyOTTD</title>
+        <link rel="Stylesheet" type="text/css" href="/style.css" />
+    </head>
+    <body>
+        <div id='outer'>
+            <div id='header'>
+                MyOTTD
+                <span style='font-size: xx-small; font-style: italic'>Like very, very alpha</span>
+            </div>
+            <div id='nav'>
+                <div id='nav_right'>
+% if c.user :
+                        Hello <strong><% c.user.username %></strong>. <a href="/logout">Logout</a>
+% else :
+                    <ul>
+                        <li><a href="/login">Login</a></li>
+                        <li><a href="/register">Register</a></li>
+                    </ul>
+% # end if
+                </div>
+                <ul>
+                    <li><a href="/">Main</a></li>
+% if c.user :
+                    <li><a href="<% h.url_for('me') %>">My servers</a></li>
+% # end if
+
+                </ul>
+            </div>
+            <div id='content'>
+% m.call_next()
+            </div>
+            <div id='footer'>
+                <p><strong>MyOTTD</strong> is an OpenTTD dedicated server hosting service. You can create and manage an OpenTTD server from your web browser, and play on it like on any other OpenTTD server.<p>
+                <p>MyOTTD is currently very alpha, which means it lacks many of the essential features that would make it worth using, but the basic functionality should be there. Log in or register to see how it works!</p>
+            </div>
+        </div>
+    </body>
+</html>
+
