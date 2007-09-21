@@ -126,6 +126,10 @@ class LoadGameQuery (RpcResource) :
     def _done (self, res, r) :
         reply(r, 'load_game', res)
 
+class ConfigQuery (RpcResource) :
+    def render_RPC (self, r, id) :
+        reply(r, 'config', self.main.servers[int(id)].getConfig())
+
 class DebugQuery (RpcResource) :
     def render_RPC (self, request) :
         reply(request, 'reload', {'id': id(self.main.servers), 'value': self.main.servers})
@@ -144,6 +148,7 @@ class Site (server.Site) :
         root.putChild('server_info', ServerInfoQuery(main))
         root.putChild('save_game', SaveGameQuery(main))
         root.putChild('load_game', LoadGameQuery(main))
+        root.putChild('config', ConfigQuery(main))
 
         server.Site.__init__(self, root)
 

@@ -6,6 +6,8 @@ from pylons.database import session_context as ctx
 import md5 as _md5
 from datetime import datetime
 
+from web.lib import settings
+
 metadata = MetaData()
 
 users_table = Table('users', metadata,
@@ -49,7 +51,7 @@ def simple_servers_list () :
 
         from_obj=[users_table.join(servers_table).join(openttd_versions_table)],
 
-        order_by=[users_table.c.id],
+        order_by=[servers_table.c.owner],
 
         bind=get_bind()
     ).execute()
@@ -116,14 +118,11 @@ def server_create (owner, name, advertise, version) :
     s.enabled = True
     s.version = version
 
-    PORT_MIN = 8170
-    PORT_MAX = 8189
-
     ports = [p for p, in select([servers_table.c.port], order_by=[asc(servers_table.c.port)], bind=get_bind()).execute()]
     
     print "ports:", ports
 
-    for port in xrange(PORT_MIN, PORT_MAX) :
+    for port in xrange(settings.PORT_MIN, settings.PORT_MAX) :
         if port not in ports :
             s.port = port
             break
@@ -153,7 +152,7 @@ climateCodeToName = {
     'candy': 'Toyland',
 }
 
-climateNamesToCode = dict([(v, k) for v, k in climateCodeToName.iteritems()])
+climateNamesToCode = dict([(v, k) for k, v in climateCodeToName.iteritems()])
 
 class User (object) :
     pass

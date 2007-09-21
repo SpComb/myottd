@@ -14,7 +14,7 @@
     </tr>
     <tr>
         <th>Connection info</th>
-        <td>zapotekII.paivola.fi:<% s['server_port'] %></td>
+        <td>dev.myottd.marttila.de:<% s['server_port'] %></td>
     </tr>
     <tr>
         <th>Version</th>
@@ -82,7 +82,13 @@
     </tr>
     <tr>
         <th>Savegame</th>
-        <td>Game <% s['game_id'] %> - <% h.fmtDatestamp(s['save_date']) %></td>
+        <td>
+%           if s['game_id'] is False :
+            Autosave
+%           else :           
+            Game <% s['game_id'] %> - <% h.fmtDatestamp(s['save_date']) %>
+%           # end if            
+        </td>
     </tr>
 %       # end if
     <tr>

@@ -28,6 +28,8 @@ def make_map (global_conf={}, app_conf={}) :
     map.connect('me_server_edit', '/me/servers/:id', controller='me', action='server_edit', conditions=dict(method='POST'))
     map.connect('me_server_newrandom', '/me/servers/:id/newrandom', controller='me', action='new_random', conditions=dict(method='POST'))
     map.connect('me_server_savegames', '/me/servers/:id/savegames', controller='me', action='savegames', conditions=dict(method='POST'))
+    map.connect('me_server_config', '/me/servers/:id/config', controller='me', action='config_view', conditions=dict(method='GET'))
+    map.connect('me_server_config_post', '/me/servers/:id/config', controller='me', action='config_apply', conditions=dict(method='POST'))
     map.connect('me_server', '/me/servers/:id', controller='me', action='server', conditions=dict(method='GET'))
 
     # Define your routes. The more specific and detailed routes should be defined first,

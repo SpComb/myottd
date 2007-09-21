@@ -6,6 +6,7 @@ import shutil
 import ConfigParser
 from datetime import date
 import re
+import cPickle
 
 import rpc
 import db
@@ -26,6 +27,28 @@ CONFIG_SETTINGS = (
 
 CONFIG_CONSTANTS = (
     ('network', 'lan_internet', 0),
+)
+
+HIDDEN_SETTINGS = (
+    ("network", "server_name"),
+    ("network", "server_port"),
+    ("network", "server_bind_ip"),
+    ("network", "connect_to_ip"),
+    ("patches", "keep_all_autosave"),
+    ("patches", "screenshot_format"),
+    ("patches", "max_num_autosaves"),
+    ("patches", "fullscreen"),
+    ("patches", "autosave_on_exit"),
+#    ("patches", ""),
+    ("misc", "sounddriver"),
+    ("misc", "videodriver"),
+    ("misc", "savegame_format"),
+    ("misc", "musicdriver"),
+    ("misc", "resolution"),
+    ("misc", "display_opt"),
+#    ("misc", ""),
+#    ("", ""),
+    ("interface", "*"),
 )
 
 def ignoreResult (callable) :
@@ -121,12 +144,14 @@ class Openttd (protocol.ProcessProtocol) :
         autosave_path = "%s/save/auto.sav" % self.path
         game_id_path = "%s/save/game_id.txt" % self.path
 
-        if not savegame and os.path.exists(autosave_path) :
+        if not savegame and os.path.exists(autosave_path) and not opts.pop("force_new", False) :
             if os.path.exists(game_id_path) :
                 self.log("found game_id.txt")
                 fh = open(game_id_path, 'r')
                 self.game_id = int(fh.read())
                 self.save_date = "auto"
+            else :
+                self.game_id = False
 
             self.log("resuming autosave with game_id=%s" % self.game_id)
             savegame = autosave_path
@@ -198,6 +223,105 @@ class Openttd (protocol.ProcessProtocol) :
             os.symlink(version_path, ver_symlink_path)
         else :
             self.log("version '%s' == '%s', '%s' == '%s'" % (cur_version, self.version, cur_version_path, version_path))
+    
+    def _getConfigValue (self, config, section, key, type, new_value=None, type_data=None) :
+        try :
+            default = None
+
+            if type == 'str' :
+                if type_data :
+                    default = type_data
+
+                value = config.get(section, key)
+                
+                # None <-> ""
+                if not value :
+                    value = None
+
+                new_value_raw = new_value
+
+                if new_value is None :
+                    new_value_raw = default
+                else :
+                    new_value_raw = new_value
+
+            elif type == 'int' :
+                if type_data :
+                    min, default, max = type_data
+
+                value = config.getint(section, key)
+                
+                if new_value is None :
+                    new_value_raw = default
+                elif not type_data or min < new_value < max :
+                    new_value_raw = new_value
+                else :
+                    raise ValueError("Value `%d' not in range (%d - %d)" % (new_value, min, max))
+
+            elif type == 'bool' :
+                if type_data :
+                    default = type_data
+
+                value = config.getboolean(section, key)
+
+                if new_value is None :
+                    new_value_raw = default
+                elif new_value :
+                    new_value_raw = 'true'
+                else :
+                    new_value_raw = 'false'
+
+            elif type == 'intlist' :
+                if type_data :
+                    length = type_data
+                    default = ','.join(['0' for x in xrange(length)])
+
+                value = config.get(section, key)
+
+                value = [int(x) for x in value.split(',')]
+
+                if new_value :
+                    new_value_raw = ','.join([str(x) for x in new_value])
+                else :
+                    new_value_raw = default
+            
+            elif type == 'omany' :
+                if type_data :
+                    default, valid = type_data
+
+                value = config.get(section, key)
+
+                if new_value is None:
+                    new_value_raw = default
+                elif not type_data or new_value in valid :
+                    new_value_raw = str(new_value)
+                else :
+                    raise ValueError("`%s' is not valid (%s)" % (value, ', '.join(valid)))
+                    
+            elif type == 'mmany' :
+                if type_data :
+                    default, valid = type_data
+
+                value = config.get(section, key).split('|')
+
+                if new_value is None :
+                    new_value_raw = default
+                else :
+                    if type_data :
+                        invalid = [x for x in new_value if x not in valid]
+
+                    if not type_data or not invalid :
+                        new_value_raw = '|'.join(new_value)
+                    else :
+                        raise ValueError("Values %s are not valid (%s)" % (', '.join(["`%s'" % x for x in invalid]), ', '.join(valid)))
+
+            else :
+                raise ValueError(type)
+
+            return value, new_value_raw
+
+        except ConfigParser.NoOptionError :
+            return default, default
 
     def updateConfig (self) :
         """
@@ -216,30 +340,9 @@ class Openttd (protocol.ProcessProtocol) :
 
         for attr_name, section, key, type in CONFIG_SETTINGS :
             new_value = getattr(self, attr_name)
-
-            if type == 'str' :
-                value = config.get(section, key)
-                
-                # None <-> ""
-                if not value :
-                    value = None
-
-                new_value_raw = new_value
-
-                if not new_value_raw :
-                    new_value_raw = ""
-            elif type == 'int' :
-                value = config.getint(section, key)
-                new_value_raw = new_value
-            elif type == 'bool' :
-                value = config.getboolean(section, key)
-                if new_value :
-                    new_value_raw = 'true'
-                else :
-                    new_value_raw = 'false'
-            else :
-                raise ValueError(type)
             
+            value, new_value_raw = self._getConfigValue(config, section, key, type, new_value)
+                    
             self.log('   %10s.%-20s: %20s -> %-20s' % (section, key, value, new_value))
 
             if value != new_value :
@@ -254,7 +357,50 @@ class Openttd (protocol.ProcessProtocol) :
             fo.close()
        
         return dirty
+    
+    # RPC
+    def getConfig (self) :
+        """
+            Returns a category_name -> [(name, type, type_data, value, descr)] dict
+        """
 
+        config_path = '%s/openttd.cfg' % self.path
+        patch_path = '%s/openttd_version/cfg_info.dat' % self.path
+
+#        self.log('reading openttd.cfg...')
+
+        config = ConfigParser.RawConfigParser()
+        config.read([config_path])
+    
+#        self.log("reading patches.dat...")
+        
+        fh = open(patch_path, 'r')
+        categories, diff_settings, diff_levels = cPickle.load(fh)
+        fh.close()
+
+        self.log("computing config...")
+
+        ret = []
+        
+        for cat_name, patches in categories :
+            if (cat_name, "*") in HIDDEN_SETTINGS :
+                continue
+                
+            out = []
+
+            for section, key, type, type_data, str in patches :
+                if (section, key) in HIDDEN_SETTINGS :
+                    continue
+
+                value, _ = self._getConfigValue(config, section, key, type)
+
+                key = "%s.%s" % (section, key)
+
+                out.append((key, type, type_data, value, str))
+            
+            ret.append((cat_name, out))
+
+        return ret, diff_settings, diff_levels
 
     def connectionMade (self) :
         """
@@ -577,6 +723,25 @@ class Openttd (protocol.ProcessProtocol) :
         return self.getServerOverview().addCallback(self._serverDetails_gotOverview)
 
     def _serverDetails_gotOverview (self, d) :
+        # savegames
+        d['games'] = {}
+
+        for dirpath, dirnames, filenames in os.walk("%s/save" % self.path) :
+            head, tail = os.path.split(dirpath.rstrip('/'))
+
+            g_id = game_id(tail)
+
+            if g_id :
+                g = d['games'][g_id] = []
+                
+                for fname in filenames :
+                    s_date = save_date(fname)
+
+                    if s_date :
+                        g.append(s_date)
+
+                g.sort()
+
         if self.running :
             return self.cmdGetdate().addCallback(self._serverDetails_gotDate, d)
         else :
@@ -607,28 +772,9 @@ class Openttd (protocol.ProcessProtocol) :
                 spectators.append(client)
             else :
                 companies[client['company']]['players'].append(client)
-            
-        # savegames
-        d['games'] = {}
-
-        for dirpath, dirnames, filenames in os.walk("%s/save" % self.path) :
-            head, tail = os.path.split(dirpath.rstrip('/'))
-
-            g_id = game_id(tail)
-
-            if g_id :
-                g = d['games'][g_id] = []
-                
-                for fname in filenames :
-                    s_date = save_date(fname)
-
-                    if s_date :
-                        g.append(s_date)
-
-                g.sort()
 
         return d
-
+            
     # Game-based perspective
     def _getNewestSave (self, game_id) :
         """

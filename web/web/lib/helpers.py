@@ -23,7 +23,10 @@ def fmtTimestamp (ts) :
 
 def fmtDatestamp (ds) :
     if ds == "auto" :
-        return "&lt;auto&gt;"
+        return "Auto"
+
+    if not ds :
+        return "N/A"
 
     return date(year=int(ds[:4]), month=int(ds[4:6]), day=int(ds[6:8])).strftime("%b %d %Y")
 

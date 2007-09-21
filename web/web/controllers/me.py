@@ -57,11 +57,13 @@ class MeController (BaseController) :
         for k in ('climate', 'map_x', 'map_y') :
             opts[k] = request.params[k]
 
-        rpc.invoke('restart', id=id, **opts)
+        rpc.invoke('restart', id=id, force_new=True, **opts)
 
         h.redirect_to('me_server', id=id)
 
     def savegames (self, id) :
+        validate(id)
+
         if request.params.get('save', False) :
             rpc.invoke('save_game', id=id)
 
@@ -75,4 +77,11 @@ class MeController (BaseController) :
                     rpc.invoke('load_game', id=id, game=game_id, save=save_id)
         
         h.redirect_to('me_server', id=id)
+
+    def config_view (self, id) :
+#        validate(id)
+
+        c.config, c.diff, c.diff_levels = rpc.invoke('config', id=id)
+
+        return render_response('me_server_config.myt')
 

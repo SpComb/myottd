@@ -41,6 +41,8 @@ checked="checked" \
         <strong>You must restart your server for the changes to take effect</strong>
 % # end if
     </form>
+
+    <a href="<% h.url_for('me_server_config', id=c.id) %>">Edit patch configuration</a>
 </fieldset>
 
 <fieldset>
