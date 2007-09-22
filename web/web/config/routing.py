@@ -32,6 +32,9 @@ def make_map (global_conf={}, app_conf={}) :
     map.connect('me_server_config_post', '/me/servers/:id/config', controller='me', action='config_apply', conditions=dict(method='POST'))
     map.connect('me_server', '/me/servers/:id', controller='me', action='server', conditions=dict(method='GET'))
 
+    # the shortcut one
+    map.connect('server_id', '/:id', controller='server', action='view', requirements=dict(id=r'[0-9]+'))
+
     # Define your routes. The more specific and detailed routes should be defined first,
     # so they may take precedent over the more generic routes. For more information, refer
     # to the routes manual @ http://routes.groovie.org/docs/

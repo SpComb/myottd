@@ -97,7 +97,6 @@ def load_lang (lang_path) :
 #   #define SLEG_GENERAL(cmd, variable, type, length, from, to) {cmd, type, length, from, to, (void*)&variable}
 # {{"map_x", (const void*)(8), SDT_NUMX, 0, 6, 11, 0, ((void *)0), STR_CONFIG_PATCHES_MAP_X, ((void *)0)}, {SL_VAR, SLE_UINT8 | SLF_SAVE_NO | SLF_NETWORK_NO, 1, 0, 255, (void*)__builtin_offsetof (Patches, map_x)}},
 
-# SettingDescGlobVarList
 settings_re = re.compile(r"const SettingDesc(?:GlobVarList)? _(.*?)_settings\[\] = \{(.*?)};", re.DOTALL)
 setting_re = re.compile(r"{{(.*?)}, {(.*?)}},")
 
@@ -210,11 +209,6 @@ def handle_block (block_data, patches, block_name, strs) :
             )
 
     return patches
-
-DIFFICULTY_SPEC = [
-    ('gameopt', 'diff_level', 'int', (0, 0, 3), "Difficulty level"),
-    ('gameopt', 'diff_custom', 'diff', (), "Difficulty settings"),
-]
 
 def handle_categories (setting_gui_path, patches, lang) :
     lang = lang

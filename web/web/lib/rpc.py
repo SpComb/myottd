@@ -4,6 +4,14 @@ import pprint
 
 import settings
 
+class RpcError (Exception) :
+    def __init__ (self, type, data) :
+        self.type = type
+        self.data = data
+    
+    def __str__ (self) :
+        return "%s: %s" % (self.type, self.data)
+
 def invoke (cmd, **args) :
     fh = urllib.urlopen("http://localhost:%d/%s?%s" % (settings.RPC_PORT, cmd, urllib.urlencode(args)))
     obj = simplejson.load(fh)
@@ -14,7 +22,16 @@ def invoke (cmd, **args) :
     if code == 'reply' :
         return data
     elif code == 'error' :
-        raise Exception("RPC error: %s %s" % (type, data))
+        raise RpcError(type, data)
+
+def server_info (id) :
+    try :
+        return invoke('server_info', id=id)
+    except RpcError, e :
+        if e.type == "KeyError" :
+            return {}
+        else :
+            raise
 
 if __name__ == '__main__' :
     from sys import argv

@@ -1,16 +1,16 @@
 % s = c.server_info
 
 % if s :
-<h1>Info on server <% s['server_name'] %></h1>
+<h1><% s['owner'] | h %>'s <% s['server_name'] | h %></h1>
 
 <table class="info_table">
     <tr>
         <th>Owner</th>
-        <td><% s['owner'] %></td>
+        <td><% s['owner'] | h %></td>
     </tr>
     <tr>
         <th>Server name</th>
-        <td>MyOTTD - <% s['owner'] | h %> - <% s['server_name'] | h %></td>
+        <td><% s['real_server_name'] | h %></td>
     </tr>
     <tr>
         <th>Connection info</th>

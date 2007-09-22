@@ -46,6 +46,7 @@ HIDDEN_SETTINGS = (
     ("misc", "musicdriver"),
     ("misc", "resolution"),
     ("misc", "display_opt"),
+    ("misc", "language"),
 #    ("misc", ""),
 #    ("", ""),
     ("interface", "*"),
@@ -107,7 +108,7 @@ class Openttd (protocol.ProcessProtocol) :
     def _setStuff (self, username, server_name, port, advertise, password, version, owner_uid) :
         self.username = username
         self._server_name = server_name
-        self.server_name = 'MyOTTD - %s - %s' % (username, server_name)
+        self.server_name = "http://myottd.net:8160/%d - %s's %s" % (self.id, username, server_name)
         self.port = port
         self.advertise = advertise
         self.password = password
@@ -696,6 +697,7 @@ class Openttd (protocol.ProcessProtocol) :
             owner=self.username,
             owner_uid=self.owner_uid,
             server_name=self._server_name,
+            real_server_name=self.server_name,
             server_port=self.port,
             version=self.version,
             has_password=bool(self.password),
