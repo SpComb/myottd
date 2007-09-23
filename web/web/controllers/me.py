@@ -43,7 +43,7 @@ class MeController (BaseController) :
 
             server.name = request.params['name']
             server.version = request.params['version']
-            server.advertise = bool(request.params.get('advertise', 0))
+#           server.advertise = bool(request.params.get('advertise', 0))
             server.password = request.params['password']
 
             server.touch()
@@ -54,10 +54,14 @@ class MeController (BaseController) :
         validate(id)
         opts = {}
 
-        for k in ('climate', 'map_x', 'map_y') :
-            opts[k] = request.params[k]
+        for k in ('gameopt.landscape', 'patches.map_x', 'patches.map_y') :
+            if 'map_' in k :
+                v = int(request.params[k])
+            else :
+                v = request.params[k]
+            opts[k] = v
 
-        rpc.invoke('restart', id=id, force_new=True, **opts)
+        rpc.invoke('config_apply', id=id, config=opts, start_new=True)
 
         h.redirect_to('me_server', id=id)
 
@@ -84,4 +88,48 @@ class MeController (BaseController) :
         c.config, c.diff, c.diff_levels = rpc.invoke('config', id=id)
 
         return render_response('me_server_config.myt')
+    
+    def config_apply (self, id ) :
+        validate(id)
+        
+        config = {}
 
+        for key, value in request.params.iteritems() :
+            type, name = key.split('_', 1)
+
+            if type == 'b' :
+                config[name] = True
+            elif type == 'bb' :
+                if name not in config :
+                    config[name] = False
+            elif type == 'i' :
+                if value :
+                    config[name] = int(value)
+                else :
+                    config[name] = 0
+            elif type == 't' :
+                config[name] = value
+            elif type == 'il' :
+                name, i = name.rsplit('_', 1)
+
+                i = int(i)
+
+                if name not in config :
+                    config[name] = []
+
+                if len(config[name]) <= i :
+                    config[name].extend([0 for x in xrange(len(config[name]), i + 1)])
+
+                config[name][i] = int(value)
+
+            elif type == 'om' :
+                config[name] = value
+
+            elif type == 'mm' :
+                config[name] = request.params.getall(key)
+            else :
+                raise ValueError(type)
+
+        c.changed = rpc.invoke('config_apply', id=id, config=config)
+        
+        return render_response('me_server_config_applied.myt')

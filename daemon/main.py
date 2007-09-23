@@ -20,9 +20,9 @@ CONFIG_SETTINGS = (
     ('port',        'network',   'server_port',        'int'    ),
     ('advertise',   'network',   'server_advertise',   'bool'   ),
     ('password',    'network',   'server_password',    'str'    ),
-    ('game_climate','gameopt',   'landscape',          'str'    ),
-    ('map_x',       'patches',   'map_x',              'int'    ),
-    ('map_y',       'patches',   'map_y',              'int'    ),
+#    ('game_climate','gameopt',   'landscape',          'str'    ),
+#    ('map_x',       'patches',   'map_x',              'int'    ),
+#    ('map_y',       'patches',   'map_y',              'int'    ),
 )
 
 CONFIG_CONSTANTS = (
@@ -47,6 +47,8 @@ HIDDEN_SETTINGS = (
     ("misc", "resolution"),
     ("misc", "display_opt"),
     ("misc", "language"),
+    ("music", "custom_1"),
+    ("music", "custom_2"),
 #    ("misc", ""),
 #    ("", ""),
     ("interface", "*"),
@@ -103,7 +105,7 @@ class Openttd (protocol.ProcessProtocol) :
         self.path = '%s/servers/%d' % (BASE_PATH, self.id)
 
         self._setStuff(*stuff)
-        self._setGameStuff()
+#        self._setGameStuff()
 
     def _setStuff (self, username, server_name, port, advertise, password, version, owner_uid) :
         self.username = username
@@ -115,22 +117,22 @@ class Openttd (protocol.ProcessProtocol) :
         self.version = version
         self.owner_uid = owner_uid
     
-    def _setGameStuff (self, climate='normal', map_x=8, map_y=8) :
-        if climate in ('normal', 'desert', 'hilly', 'candy') :
-            self.game_climate = climate
-        else :
-            raise ValueError(climate)
-
-        if 6 <= map_x <= 11 and 6 <= map_y <= 11 :
-            self.map_x = map_x
-            self.map_y = map_y
-        else :
-            raise ValueError((map_x, map_y))
-
+#    def _setGameStuff (self, climate='normal', map_x=8, map_y=8) :
+#        if climate in ('normal', 'desert', 'hilly', 'candy') :
+#            self.game_climate = climate
+#        else :
+#            raise ValueError(climate)
+#
+#        if 6 <= map_x <= 11 and 6 <= map_y <= 11 :
+#            self.map_x = map_x
+#            self.map_y = map_y
+#        else :
+#            raise ValueError((map_x, map_y))
+#
     def log (self, msg) :
         print '%d: %s' % (self.id, msg)
 
-    def start (self, opts={}, _fetchDb=True) :
+    def start (self, savegame=None, _fetchDb=True) :
         """
             Prepare the environment and start the openttd server
         """
@@ -140,12 +142,10 @@ class Openttd (protocol.ProcessProtocol) :
         self.startup = defer.Deferred()
         self.game_id = self.save_date = None
 
-        savegame = opts.pop('savegame', None)
-        
         autosave_path = "%s/save/auto.sav" % self.path
         game_id_path = "%s/save/game_id.txt" % self.path
 
-        if not savegame and os.path.exists(autosave_path) and not opts.pop("force_new", False) :
+        if savegame is None and os.path.exists(autosave_path) :
             if os.path.exists(game_id_path) :
                 self.log("found game_id.txt")
                 fh = open(game_id_path, 'r')
@@ -156,12 +156,11 @@ class Openttd (protocol.ProcessProtocol) :
 
             self.log("resuming autosave with game_id=%s" % self.game_id)
             savegame = autosave_path
+        else :
+            self.log("not resuming, starting new random map")
 
-        self.random_map = not bool(savegame)
+        self.random_map = (savegame is None)
 
-        if opts :
-            self._setGameStuff(**opts)
-        
         if _fetchDb :
             db.query(SERVER_QUERY_BASE + " AND s.id=%s", self.id).addCallback(self._gotServerSettings, savegame)
         else :
@@ -187,19 +186,6 @@ class Openttd (protocol.ProcessProtocol) :
         
         self.log("starting openttd... with args: ./%s" % " ".join(args))
         reactor.spawnProcess(self, '%s/openttd' % self.path, args=args, path=self.path, usePTY=True)
-
-    def applyConfig (self, *stuff) :
-        """
-            apply the new configuration, and if needed, restart the server
-        """
-        
-        self._setStuff(*stuff)
-
-        if self.updateConfig() :
-            self.log("configuration changed, restarting server")
-            self.restart()
-        else :
-            self.log("configuration unchanged")
 
     def checkFilesystem (self) :
         """
@@ -234,13 +220,9 @@ class Openttd (protocol.ProcessProtocol) :
                     default = type_data
 
                 value = config.get(section, key)
+
+                print "value for str %s.%s is: %s" % (section, key, repr(value))
                 
-                # None <-> ""
-                if not value :
-                    value = None
-
-                new_value_raw = new_value
-
                 if new_value is None :
                     new_value_raw = default
                 else :
@@ -254,10 +236,10 @@ class Openttd (protocol.ProcessProtocol) :
                 
                 if new_value is None :
                     new_value_raw = default
-                elif not type_data or min < new_value < max :
+                elif not type_data or (min <= new_value or min == -1) and (new_value <= max or max == -1) :
                     new_value_raw = new_value
                 else :
-                    raise ValueError("Value `%d' not in range (%d - %d)" % (new_value, min, max))
+                    raise ValueError("Value `%d' for '%s.%s' not in range (%d - %d)" % (new_value, section, key, min, max))
 
             elif type == 'bool' :
                 if type_data :
@@ -360,11 +342,7 @@ class Openttd (protocol.ProcessProtocol) :
         return dirty
     
     # RPC
-    def getConfig (self) :
-        """
-            Returns a category_name -> [(name, type, type_data, value, descr)] dict
-        """
-
+    def _loadConfigInfo (self) :
         config_path = '%s/openttd.cfg' % self.path
         patch_path = '%s/openttd_version/cfg_info.dat' % self.path
 
@@ -379,6 +357,21 @@ class Openttd (protocol.ProcessProtocol) :
         categories, diff_settings, diff_levels = cPickle.load(fh)
         fh.close()
 
+        return config, categories, diff_settings, diff_levels
+    
+    def _writeConfigObj (self, config) :
+        config_path = '%s/openttd.cfg' % self.path
+
+        fo = open(config_path, 'w')
+        config.write(fo)
+        fo.close()
+
+    def getConfig (self) :
+        """
+            Returns a category_name -> [(name, type, type_data, value, descr)] dict
+        """
+
+        config, categories, diff_settings, diff_levels = self._loadConfigInfo()
         self.log("computing config...")
 
         ret = []
@@ -402,6 +395,68 @@ class Openttd (protocol.ProcessProtocol) :
             ret.append((cat_name, out))
 
         return ret, diff_settings, diff_levels
+
+    def applyConfig (self, new_config, start_new=False) :
+        """
+            Stop the server, write out the config, and then start it again
+        """
+        
+        if self.running :
+            return self.stop().addCallback(self._doApplyConfig_stopped, new_config, True, start_new)
+        else :
+            return self._doApplyConfig_stopped(None, new_config, False, start_new)
+
+    def _doApplyConfig_stopped (self, res, new_config, start, start_new) :
+        config, categories, diff_settings, diff_levels = self._loadConfigInfo()
+        
+        config_types = {}
+
+        for cat_name, patches in categories :
+            if (cat_name, "*") in HIDDEN_SETTINGS :
+                continue
+                
+            out = []
+
+            for section, key, type, type_data, str in patches :
+                if (section, key) in HIDDEN_SETTINGS :
+                    continue
+
+                config_types["%s.%s" % (section, key)] = type, type_data
+        
+        print "applying %d config items (%d known items)" % (len(new_config), len(config_types))
+
+        changed = {}
+
+        for key, value in new_config.iteritems() :
+            section, name = key.split('.', 1)
+
+            type, type_data = config_types[key]
+
+            cur_value, new_value_raw = self._getConfigValue(config, section, name, type, value, type_data)
+
+            config.set(section, name, new_value_raw)
+
+            if cur_value != value :
+                changed[key] = (cur_value, value)
+        
+        print "writing out, %d changed: %s" % (len(changed), changed)
+
+        self._writeConfigObj(config)
+        
+        if start_new :
+            sg = False
+        else :
+            sg = None
+        
+        self.log("start=%r, start_new=%r, sg=%r" % (start, start_new, sg))
+
+        if start :
+            return self.start(sg).addCallback(self._doApplyConfig_started, changed)
+        else :
+            return defer.succeed(changed)
+
+    def _doApplyConfig_started (self, res, changed) :
+        return changed
 
     def connectionMade (self) :
         """
@@ -580,18 +635,18 @@ class Openttd (protocol.ProcessProtocol) :
         return Delay(2)
         
     # restart (stop + start)
-    def restart (self, opts=None) :
+    def restart (self, savegame=None) :
         if self.running :
             self.log("restarting...")
 
-            return self.stop().addCallback(self._doRestart_stopped, opts)
+            return self.stop().addCallback(self._doRestart_stopped, savegame)
         else :
             self.log("not running, will just start")
 
-            self.start(opts)
+            self.start(savegame)
 
-    def _doRestart_stopped (self, res, opts) :
-        self.start(opts)
+    def _doRestart_stopped (self, res, savegame) :
+        self.start(savegame)
 
     # server_info command
     def queryServerInfo (self) :
@@ -701,9 +756,9 @@ class Openttd (protocol.ProcessProtocol) :
             server_port=self.port,
             version=self.version,
             has_password=bool(self.password),
-            climate=self.game_climate,
-            map_x=self.map_x,
-            map_y=self.map_y,
+#            climate=self.game_climate,
+#            map_x=self.map_x,
+#            map_y=self.map_y,
             password=self.password,
             game_id=self.game_id,
             save_date=self.save_date,
@@ -851,7 +906,7 @@ class Openttd (protocol.ProcessProtocol) :
         else :
             self.log("not running yet, so starting up with savegame at %s" % save_path)
 
-            return self.start(opts={'savegame': "%s/%s/%s" % (self.path, save_dir, save_fname)}).addCallback(self._doLoadGame_started, game_id, save_date)
+            return self.start("%s/%s/%s" % (self.path, save_dir, save_fname)).addCallback(self._doLoadGame_started, game_id, save_date)
 
     def _doLoadGame_started (self, res, game_id, save_date) :
         self.game_id = game_id
@@ -886,10 +941,10 @@ class ServerManager (object) :
 
         db.query(SERVER_QUERY_BASE).addCallback(self._gotServers).addErrback(failure)
 
-    def _startServer (self, row, opts={}) :
+    def _startServer (self, row, sg=None) :
         id = row[0]
         s = self.servers[id] = Openttd(self, *row)
-        return s.start(_fetchDb=False, opts=opts)
+        return s.start(sg, _fetchDb=False)
 
     def _gotServers (self, rows) :
         if not rows :
@@ -903,25 +958,25 @@ class ServerManager (object) :
             self._startServer(row)
 
 
-    def startServer (self, id, opts) :
+    def startServer (self, id, sg=None) :
         if id in self.servers :
-            return self.servers[id].start(opts=opts)
+            return self.servers[id].start(sg)
         else :
-            return db.query(SERVER_QUERY_BASE + " AND s.id=%s", id).addCallback(self._gotServerInfo, id, opts)
+            return db.query(SERVER_QUERY_BASE + " AND s.id=%s", id).addCallback(self._gotServerInfo, id, sg)
 
-    def _gotServerInfo (self, res, id, opts) :
+    def _gotServerInfo (self, res, id, sg) :
         if not res :
             raise KeyError(id)
 
         row = res[0]
 
-        return self._startServer(row, opts)
+        return self._startServer(row, sg)
     
     def stopServer (self, id) :
         return self.servers[id].stop()
 
-    def restartServer (self, id, opts={}) :
-        return self.servers[id].restart(opts)
+    def restartServer (self, id, sg=None) :
+        return self.servers[id].restart(sg)
 
     def shutdown (self) :
         d = []

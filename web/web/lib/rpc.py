@@ -13,6 +13,8 @@ class RpcError (Exception) :
         return "%s: %s" % (self.type, self.data)
 
 def invoke (cmd, **args) :
+    args = dict([(key, simplejson.dumps(value)) for key, value in args.iteritems()])
+    print "%s: %s" % (cmd, args)
     fh = urllib.urlopen("http://localhost:%d/%s?%s" % (settings.RPC_PORT, cmd, urllib.urlencode(args)))
     obj = simplejson.load(fh)
     fh.close()

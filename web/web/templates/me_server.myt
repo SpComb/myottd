@@ -1,6 +1,6 @@
 
 <fieldset>
-    <legend>Edit server</legend>
+    <legend>Server options</legend>
 
     <form action="<% h.url_for('me_server_edit', id=c.server_id) %>" method="POST">
         <label for="name">Name</label>
@@ -19,6 +19,7 @@
 % # end if
         <br/>
 
+<!--
         <label for="advertise">Advertise</label>
         <input type="checkbox" name="advertise" value="1" class="checkbox" \
 % if c.server_advertise :
@@ -26,6 +27,7 @@ checked="checked" \
 % # end if
 />
         <br/>
+-->
 
         <label for="password">Password</label>
         <input type="text" name="password" value="<% c.server_password | h %>" />
@@ -42,7 +44,7 @@ checked="checked" \
 % # end if
     </form>
 
-    <a href="<% h.url_for('me_server_config', id=c.id) %>">Edit patch configuration</a>
+    <a href="<% h.url_for('me_server_config', id=c.id) %>">Edit game configuration</a>
 </fieldset>
 
 <fieldset>
@@ -71,17 +73,17 @@ checked="checked" \
     <legend>Start new random game</legend>
 
     <form action="<% h.url_for('me_server_newrandom', id=c.server_id) %>" method="POST">
-        <label for="climate">Climate</label>
-        <select name="climate">
+        <label for="gameopt.landscape">Climate</label>
+        <select name="gameopt.landscape">
             <% h.options_for_select(h.climate_opts, c.server_info.get('climate', None)) %>
         </select>
         <br/>
 
 % map_geom_opts = [(2**x, x) for x in xrange(6, 11)]
-        <label for="map_x map_y">Map Size</label>
-        <select name="map_x" class="thin">
+        <label for="patches.map_x patches.map_y">Map Size</label>
+        <select name="patches.map_x" class="thin">
             <% h.options_for_select(map_geom_opts, c.server_info.get('map_x', None)) %>
-        </select> x <select name="map_y" class="thin">
+        </select> x <select name="patches.map_y" class="thin">
             <% h.options_for_select(map_geom_opts, c.server_info.get('map_y', None)) %>
         </select>
         <br/>

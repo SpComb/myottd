@@ -64,18 +64,20 @@
             Random map
         </td>
     </tr>
+<!--   
     <tr>
         <th>Climate</th>
         <td>
-            <% h.climateName(s['climate']) %>    
+            <% False and h.climateName(s['climate']) %>    
         </td>
     </tr>
     <tr>
         <th>Map size</th>
         <td>
-            <% h.mapSize(s['map_x']) %> x <% h.mapSize(s['map_y']) %>
+            <% False and h.mapSize(s['map_x']) %> x <% False and h.mapSize(s['map_y']) %>
         </td>
     </tr>
+-->
 %       else :
             Savegame
         </td>

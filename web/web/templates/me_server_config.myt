@@ -23,22 +23,23 @@
         <tr>
             <td class="value">
 %       if type == 'bool' :
-        <input type="checkbox" name="<% name %>" class="checkbox" \
+        <input type="hidden" name="bb_<% name %>" value="0" />
+        <input type="checkbox" name="b_<% name %>" value="1" class="checkbox" \
 %           if value :
 checked="checked" \
 %           # end if
 >
 %           value = value and 'On' or 'Off'
 %       elif type == 'int' :
-        <input type="text" name="<% name %>" value="<% value %>" />
+        <input type="text" name="i_<% name %>" value="<% value %>" />
 %       elif type == 'str' :
-        <input type="text" name="<% name %>" value="<% value %>" />
+        <input type="text" name="t_<% name %>" value="<% value %>" />
 %       elif type == 'intlist' :
 %           for i, v in enumerate(value) :
-        <input type="text" name="<% name %>_<% i %>" value="<% v %>" class="thin" />
+        <input type="text" name="il_<% name %>_<% i %>" value="<% v %>" class="thin" />
 %           # end for
 %       elif type in ('omany', 'mmany') :
-            <select name="<% name %>" \
+            <select name="<% type[0] %>m_<% name %>" \
 %           if type == 'mmany' :
 multiple="multiple" \
 %           # end if
@@ -74,7 +75,7 @@ multiple="multiple" \
     <table>
         <tr>
             <td>
-                <select name="diff_level">
+                <select name="i_gameopt.diff_level">
                     <% h.options_for_select([(n, i) for i, n in enumerate(c.diff_levels)], diff_level) %>
                 </select>
             </td>
@@ -90,22 +91,22 @@ multiple="multiple" \
         <tr>
             <td>
 %   if value_names :
-                <select name="diff_custom_<% i %>">
+                <select name="il_gameopt.diff_custom_<% i %>">
                     <% h.options_for_select([(n, i) for i, n in enumerate(value_names)], value) %>
                 </select>
 %   else :
 %       if '<currency>' in name :
 %           name = name.replace('<currency>', '')
-            <select name="diff_custom_<% i %>">
+            <select name="il_gameopt.diff_custom_<% i %>">
                 <% h.options_for_select([(i*1000, i) for i in xrange(min, max, step)], value) %>
             </select> &pound;
 %       elif '<percentage>' in name :
 %           name = name.replace('<percentage>', '')
-            <select name="diff_custom_<% i %>">
+            <select name="il_gameopt.diff_custom_<% i %>">
                 <% h.options_for_select(xrange(min, max), value) %>
             </select> %
 %       else :
-            <input type="text" name="diff_custom_<% i %>" value="<% value %>" />
+            <input type="text" name="il_gameopt.diff_custom_<% i %>" value="<% value %>" />
 %       # end if            
 %   # end if
             </td>
@@ -117,4 +118,8 @@ multiple="multiple" \
     </table>
 </fieldset>
 
+<input type="submit" value="Apply Config" /> <strong>Applying the configuration will cause the server to restart</strong>
 </form>
+<form action="<% h.url_for('me_server', id=c.id) %>" method="GET"><input type="submit" value="Cancel" /></form>
+
+

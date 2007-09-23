@@ -44,7 +44,7 @@ class RpcResource (resource.Resource) :
 
     def render_GET (self, request) :
         try :
-            self.render_RPC(request, **dict((k, request.args[k][0]) for k in request.args))
+            self.render_RPC(request, **dict((k, simplejson.loads(request.args[k][0])) for k in request.args))
         except Exception, e :
             error(request, e.__class__.__name__, str(e))
             print "Error in http_api:"
@@ -62,15 +62,9 @@ class RpcResource (resource.Resource) :
         
         return failure
 
-def process_opts (opts) :
-     for k in ('map_x', 'map_y') :
-        if k in opts :
-            opts[k] = int(opts[k])
-
 class StartQuery (RpcResource) :
-    def render_RPC (self, request, id, **opts) :
-        process_opts(opts)
-        defer.maybeDeferred(self.main.startServer, int(id), opts=opts).addCallback(self.started, request).addErrback(self.failure, request)
+    def render_RPC (self, request, id, sg=None) :
+        defer.maybeDeferred(self.main.startServer, int(id), sg).addCallback(self.started, request).addErrback(self.failure, request)
 
     def started (self, ret, request) :
         reply(request, 'start', 'ok')
@@ -83,9 +77,8 @@ class StopQuery (RpcResource) :
         reply(request, 'stop', 'ok')
 
 class RestartQuery (RpcResource) :
-    def render_RPC (self, request, id, **opts) :
-        process_opts(opts)
-        defer.maybeDeferred(self.main.restartServer, int(id), opts=opts).addCallback(self.restarted, request).addErrback(self.failure, request)
+    def render_RPC (self, request, id, sg) :
+        defer.maybeDeferred(self.main.restartServer, int(id), sg).addCallback(self.restarted, request).addErrback(self.failure, request)
 
     def restarted (self, ret, request) :
         reply(request, 'restart', 'ok')
@@ -130,6 +123,13 @@ class ConfigQuery (RpcResource) :
     def render_RPC (self, r, id) :
         reply(r, 'config', self.main.servers[int(id)].getConfig())
 
+class ConfigApplyQuery (RpcResource) :
+    def render_RPC (self, r, id, config, start_new=False) :
+        self.main.servers[int(id)].applyConfig(config, bool(start_new)).addCallback(self._done, r).addErrback(self.failure, r)
+
+    def _done (self, res, r) :
+        reply(r, 'config_apply', res)
+
 class DebugQuery (RpcResource) :
     def render_RPC (self, request) :
         reply(request, 'reload', {'id': id(self.main.servers), 'value': self.main.servers})
@@ -149,6 +149,7 @@ class Site (server.Site) :
         root.putChild('save_game', SaveGameQuery(main))
         root.putChild('load_game', LoadGameQuery(main))
         root.putChild('config', ConfigQuery(main))
+        root.putChild('config_apply', ConfigApplyQuery(main))
 
         server.Site.__init__(self, root)
 
