@@ -21,7 +21,7 @@
 %   # end if
         </td>
         <td>
-            <a href="<% h.url_for('server_info', id=s['id']) %>"><% s['server_name'] %></a>
+            <a href="<% h.url_for('server_info', id=s['id']) %>"><% s['server_url'] and "%s - " % s['server_url'] or '' %><% s['server_name'] %></a>
         </td>
         <td>
             <% s['cur_clients'] %> / <% s['max_clients'] %>

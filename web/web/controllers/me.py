@@ -7,29 +7,33 @@ def validate (id) :
 class MeController (BaseController) :
 #    def __before__ (self) :
 #        super(MeController, self).__before__()
-
+    
+    @require_login
     def index (self) :
        c.user_servers = model.user_servers(c.user.id)
        c.available_versions = model.available_versions()
 
        return render_response('me_index.myt') 
     
+    @require_login
+    @form_handler
     def server_add (self) :
-        s = model.server_create(c.user.id, request.params['name'], request.params.get('advertise', False), int(request.params.get('version')))
+        s = model.server_create(c.user.id, request.params['url'], request.params['name'], int(request.params.get('version')))
         
         h.redirect_to('me_server', id=s.id)
     
+    @validate_id
     def server (self, id) :
-        validate(id)
         c.server_id = id
-        c.server_name, c.owner_name, c.server_port, c.server_status, c.server_version, c.server_version_id, c.server_config_stale, c.server_password = model.server_info(id)
+        c.server_name, c.owner_name, c.server_port, c.server_status, c.server_version, c.server_version_id, c.server_config_stale, c.server_password, c.server_url = model.server_info(id)
         c.server_info = rpc.server_info(id)
         c.available_versions = model.available_versions()
         
         return render_response('me_server.myt')
     
+    @validate_id
+    @form_handler
     def server_edit (self, id) :
-        validate(id)
         action = request.params['action']
 
         if action == 'Stop' :
@@ -40,7 +44,8 @@ class MeController (BaseController) :
             rpc.invoke('restart', id=id)
         elif action == 'Apply' :
             server = model.Server.get_by(id=id)
-
+            
+            server.url = request.params['url']
             server.name = request.params['name']
             server.version = request.params['version']
 #           server.advertise = bool(request.params.get('advertise', 0))
@@ -50,8 +55,8 @@ class MeController (BaseController) :
         
         h.redirect_to('me_server', id=id)
     
+    @validate_id
     def new_random (self, id) :
-        validate(id)
         opts = {}
 
         for k in ('gameopt.landscape', 'patches.map_x', 'patches.map_y') :
@@ -65,9 +70,8 @@ class MeController (BaseController) :
 
         h.redirect_to('me_server', id=id)
 
+    @validate_id
     def savegames (self, id) :
-        validate(id)
-
         if request.params.get('save', False) :
             rpc.invoke('save_game', id=id)
 
@@ -83,15 +87,12 @@ class MeController (BaseController) :
         h.redirect_to('me_server', id=id)
 
     def config_view (self, id) :
-#        validate(id)
-
         c.config, c.diff, c.diff_levels = rpc.invoke('config', id=id)
 
         return render_response('me_server_config.myt')
     
+    @validate_id
     def config_apply (self, id ) :
-        validate(id)
-        
         config = {}
 
         for key, value in request.params.iteritems() :
@@ -133,3 +134,4 @@ class MeController (BaseController) :
         c.changed = rpc.invoke('config_apply', id=id, config=config)
         
         return render_response('me_server_config_applied.myt')
+

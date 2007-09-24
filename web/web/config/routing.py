@@ -8,37 +8,37 @@ def make_map (global_conf={}, app_conf={}) :
     root_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
     map = Mapper(directory=os.path.join(root_path, 'controllers'))
+
+    map.sub_domains = True
+    map.sub_domains_ignore = ['www']
     
     # This route handles displaying the error page and graphics used in the 404/500
     # error pages. It should likely stay at the top to ensure that the error page is
     # displayed properly.
     map.connect('error/:action/:id', controller='error')
+
+    # sub_domain optional
+    map.connect('login',                    '/login', controller='auth', action='login_show', conditions=dict(method='GET'))
+    map.connect('login_post',               '/login', controller='auth', action='login', conditions=dict(method='POST'))
+
+    # sub_domain required
+    map.connect('admin',                    '/admin', controller='me', action='index', conditions=dict(sub_domain=True))
+    map.connect('admin_server_add',         '/admin/add', controller='me', action='server_add', conditions=dict(method='POST', sub_domain=True))
+    map.connect('admin_server',             '/admin/:id', controller='me', action='server', conditions=dict(method='GET', sub_domain=True))
+    map.connect('admin_server_edit',        '/admin/:id', controller='me', action='server_edit', conditions=dict(method='POST', sub_domain=True))
+    map.connect('admin_server_newrandom',   '/admin/:id/newrandom', controller='me', action='new_random', conditions=dict(method='POST', sub_domain=True))
+    map.connect('admin_server_savegames',   '/admin/:id/savegames', controller='me', action='savegames', conditions=dict(method='POST', sub_domain=True))
+    map.connect('admin_server_config',      '/admin/:id/config', controller='me', action='config_view', conditions=dict(method='GET', sub_domain=True))
+    map.connect('admin_server_config_post', '/admin/:id/config', controller='me', action='config_apply', conditions=dict(method='POST', sub_domain=True))
     
-    map.connect('main', '/', controller='index', action='view')
-    map.connect('server_info', '/servers/:id', controller='server', action='view')
+    map.connect('user',                     '/', controller='my_user', action='index', conditions=dict(sub_domain=True))
+    map.connect('server',                   '/*url', controller='my_user', action='view_server', conditions=dict(sub_domain=True))
 
-    map.connect('auth_register_post', '/register', controller='auth', action='register', conditions=dict(method='POST'))
-    map.connect('auth_register', '/register', controller='auth', action='register_show', conditions=dict(method='GET'))
-    map.connect('auth_login_post', '/login', controller='auth', action='login', conditions=dict(method='POST'))
-    map.connect('auth_login', '/login', controller='auth', action='login_show', conditions=dict(method='GET'))
-    map.connect('auth_logout', '/logout', controller='auth', action='logout')
+    # sub_domainless
+    map.connect('home',                     '/', controller='index', action='view')
 
-    map.connect('me', '/me', controller='me', action='index')
-    map.connect('me_server_add', '/me/servers/add', controller='me', action='server_add', conditions=dict(method='POST'))
-    map.connect('me_server_edit', '/me/servers/:id', controller='me', action='server_edit', conditions=dict(method='POST'))
-    map.connect('me_server_newrandom', '/me/servers/:id/newrandom', controller='me', action='new_random', conditions=dict(method='POST'))
-    map.connect('me_server_savegames', '/me/servers/:id/savegames', controller='me', action='savegames', conditions=dict(method='POST'))
-    map.connect('me_server_config', '/me/servers/:id/config', controller='me', action='config_view', conditions=dict(method='GET'))
-    map.connect('me_server_config_post', '/me/servers/:id/config', controller='me', action='config_apply', conditions=dict(method='POST'))
-    map.connect('me_server', '/me/servers/:id', controller='me', action='server', conditions=dict(method='GET'))
-
-    # the shortcut one
-    map.connect('server_id', '/:id', controller='server', action='view', requirements=dict(id=r'[0-9]+'))
-
-    # Define your routes. The more specific and detailed routes should be defined first,
-    # so they may take precedent over the more generic routes. For more information, refer
-    # to the routes manual @ http://routes.groovie.org/docs/
-    map.connect(':controller/:action/:id')
-    map.connect('*url', controller='template', action='view')
-
+    map.connect('register_post',            '/register', controller='auth', action='register', conditions=dict(method='POST'))
+    map.connect('register',                 '/register', controller='auth', action='register_show', conditions=dict(method='GET'))
+    map.connect('logout',                   '/logout', controller='auth', action='logout')
+    
     return map

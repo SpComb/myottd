@@ -3,7 +3,7 @@
 
     <form action="/login" method="POST">
         <label for="username">Username</label>
-        <input type="text" name="username" />
+        <input type="text" name="username" value="<% c.sub_domain %>" />
         <br/>
 
         <label for="password">Password</label>

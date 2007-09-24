@@ -14,7 +14,7 @@
     </tr>
     <tr>
         <th>Connection info</th>
-        <td>dev.myottd.marttila.de:<% s['server_port'] %></td>
+        <td>myottd.net:<% s['server_port'] %></td>
     </tr>
     <tr>
         <th>Version</th>

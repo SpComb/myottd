@@ -33,3 +33,6 @@ def fmtDatestamp (ds) :
 def fmtDateDict (dd) :
     return date(year=dd['year'], month=dd['month'], day=dd['day']).strftime("%b %d %Y")
 
+def serverName (username, url, title) :
+   return "%s.myottd.net%s - %s" % (username, (url and "/%s" % url or ''), title)
+

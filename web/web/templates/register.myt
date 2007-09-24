@@ -3,7 +3,7 @@
 
     <form action="/register" method="POST">
         <label for="username">Username</label>
-        <input type="text" name="username" />
+        <input type="text" name="username" />.myottd.net
         <br/>
 
         <label for="password">Password</label>
@@ -15,6 +15,8 @@
         <br/>
         
         <input type="submit" value="Register" />
+
+        <p class="form_hint">Your username will be used as a subdomain of myottd.net (i.e. username.myottd.net), and thence must start with a letter, contain only letters, numbers and dashes, and end in a letter or number</p>
     </form>
 </fieldset>
 

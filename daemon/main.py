@@ -107,10 +107,11 @@ class Openttd (protocol.ProcessProtocol) :
         self._setStuff(*stuff)
 #        self._setGameStuff()
 
-    def _setStuff (self, username, server_name, port, advertise, password, version, owner_uid) :
+    def _setStuff (self, username, server_name, port, advertise, password, version, owner_uid, url) :
         self.username = username
         self._server_name = server_name
-        self.server_name = "http://myottd.net:8160/%d - %s's %s" % (self.id, username, server_name)
+        self.url = url
+        self.server_name = "%s.myottd.net%s - %s" % (username, url and '/%s' % url or '', server_name)
         self.port = port
         self.advertise = advertise
         self.password = password
@@ -751,6 +752,7 @@ class Openttd (protocol.ProcessProtocol) :
             running=self.running,
             owner=self.username,
             owner_uid=self.owner_uid,
+            server_url=self.url,
             server_name=self._server_name,
             real_server_name=self.server_name,
             server_port=self.port,
@@ -931,7 +933,7 @@ class Openttd (protocol.ProcessProtocol) :
 def failure (failure) :
     print 'FAILURE: %s' % failure
 
-COLS = "u.username, s.name, s.port, s.advertise, s.password, o_v.version, u.id"
+COLS = "u.username, s.name, s.port, s.advertise, s.password, o_v.version, u.id, s.url"
 SERVER_QUERY_BASE = "SELECT s.id, %s FROM servers s INNER JOIN users u ON s.owner = u.id INNER JOIN openttd_versions o_v ON s.version = o_v.id WHERE s.enabled" % COLS
 
 class ServerManager (object) :

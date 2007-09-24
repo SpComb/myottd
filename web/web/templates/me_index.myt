@@ -1,38 +1,52 @@
+% if c.user_servers :
 <h1>Your servers</h1>
 
 <table>
     <tr>
-        <th>ID</th>
         <th>Name</th>
         <th>Port</th>
         <th>Advertise</th>
         <th>Status</th>
         <th>Version</th>
     </tr>
-% if c.user_servers :
-%   for id, name, port, advertise, status, version in c.user_servers :
+%   for id, url, name, port, advertise, status, version in c.user_servers :
     <tr>
-        <td><a href="<% h.url_for('me_server', id=id) %>"><% id %></a></td>
-        <td><% name %></td>
+        <td><a href="<% h.url_for('me_server', id=id) %>"><% h.serverName(c.user.username, url, name) %></a></td>
         <td><% port %></td>
         <td><% advertise %></td>
         <td><% status.title() %></td>
         <td><% version %></td>
     </tr>
-%   # end if
-% else :
-    <tr>
-        <td colspan="5" style="text-align: center">No servers</td>
-    </tr>
-% # end if
+%   # end for
 </table>
+% else :
+<h1>No servers yet</h1>
+% # end if
+
+<script type="text/javascript">
+    function changed () {
+        var f = document.forms[0]
+
+        var s = "<% c.user.username %>.myottd.net" + (f.url.value ? ("/" + f.url.value) : "") + " - " + f.name.value;
+
+        var d = document.getElementById("output_name");
+
+        d.innerHTML = s;
+    }
+</script>
 
 <fieldset>
     <legend>Create Server</legend>
 
     <form action="<% h.url_for('me_server_add') %>" method="POST">
-        <label for="name">Name</label>
-        <input type="text" name="name" />
+        <label for="url">Url</label>
+        <input type="text" name="url" onchange="changed()" />
+        <span class="hint">letters, numbers, some punctuation only, may be blank</span>
+        <br/>
+
+        <label for="name">Title</label>
+        <input type="text" name="name" onchange="changed()" />
+        <span class="hint">required</span>
         <br/>
 
         <label for="version">Version</label>
@@ -41,11 +55,16 @@
         </select>
         <br/>
 
+<!--
         <label for="advertise">Advertise</label>
         <input type="checkbox" name="advertise" value="1" class="checkbox" checked="checked" />
         <br/>
+-->
 
         <input type="submit" value="Add" />
+
+        <p class="form_hint">Server name: <strong id="output_name"><% c.user.username %>.myottd.net/&lt;url&gt; - &lt;title&gt;</strong></p>
     </form>
 </fieldset>
+
 

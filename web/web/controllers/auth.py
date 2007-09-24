@@ -18,10 +18,11 @@ class AuthController (BaseController) :
     def register_show (self) :
         return render_response('register.myt')
     
+    @form_handler
     def register (self) :
         if request.params['password'] != request.params['password_verify'] :
-            return Response("passwords don't match")
-
+            raise ValueError("passwords don't match")
+        
         user = model.register_user(request.params['username'], request.params['password'])
         
         session['user_id'] = user.id

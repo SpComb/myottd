@@ -4,6 +4,7 @@
         <link rel="Stylesheet" type="text/css" href="/style.css" />
     </head>
     <body>
+        <!-- subdomain: <% c.sub_domain %> -->
         <div id='outer'>
             <div id='header'>
                 MyOTTD
@@ -12,18 +13,18 @@
             <div id='nav'>
                 <div id='nav_right'>
 % if c.user :
-                        Hello <strong><% c.user.username %></strong>. <a href="/logout">Logout</a>
+                        Hello <strong><% c.user.username %></strong>. <a href="<% h.url_for('logout') %>">Logout</a>
 % else :
                     <ul>
-                        <li><a href="/login">Login</a></li>
-                        <li><a href="/register">Register</a></li>
+                        <li><a href="<% h.url_for('login', sub_domain=c.sub_domain) %>">Login</a></li>
+                        <li><a href="<% h.url_for('register') %>">Register</a></li>
                     </ul>
 % # end if
                 </div>
                 <ul>
-                    <li><a href="/">Main</a></li>
+                    <li><a href="<% h.url_for('home') %>">Main</a></li>
 % if c.user :
-                    <li><a href="<% h.url_for('me') %>">My servers</a></li>
+                    <li><a href="<% h.url_for('admin') %>">Manage Servers</a></li>
 % # end if
 
                 </ul>

@@ -25,7 +25,7 @@ openttd_versions_table = Table('openttd_versions', metadata,
 servers_table = Table('servers', metadata,
     Column('id', Integer, primary_key=True),
     Column('owner', Integer, ForeignKey('users.id')),
-    Column('name', Unicode(50)),
+    Column('name', Unicode(20)),
     Column('port', Integer),
     Column('enabled', Boolean),
     Column('advertise', Boolean),
@@ -34,6 +34,7 @@ servers_table = Table('servers', metadata,
     Column('config_changed', DateTime()),
     Column('config_applied', DateTime()),
     Column('password', String(30)),
+    Column('url', String(20)),
 )
 
 def get_bind () :
@@ -45,13 +46,14 @@ def simple_servers_list () :
         [
             servers_table.c.id,
             users_table.c.username,
+            servers_table.c.url,
             servers_table.c.name,
             openttd_versions_table.c.version,
         ],
 
         from_obj=[users_table.join(servers_table).join(openttd_versions_table)],
 
-        order_by=[servers_table.c.owner],
+        order_by=[asc(servers_table.c.owner)],
 
         bind=get_bind()
     ).execute()
@@ -67,6 +69,7 @@ def server_info (id) :
             openttd_versions_table.c.id,
             servers_table.c.config_changed > servers_table.c.config_applied,
             servers_table.c.password,
+            servers_table.c.url,
         ],
 
         servers_table.c.id == id,
@@ -80,6 +83,9 @@ def md5 (data) :
     return _md5.md5(data).hexdigest()
 
 def register_user (username, password) :
+    if not username or not password :
+        raise ValueError("Username/Password can't be empty strings")
+
     u = User()
     u.username = username
     u.password = md5(password)
@@ -92,9 +98,10 @@ def user_login (username, password) :
     return User.get_by(username=username, password=md5(password))
 
 def user_servers (user_id) :
-    return select(
+    return list(select(
         [
             servers_table.c.id, 
+            servers_table.c.url,
             servers_table.c.name, 
             servers_table.c.port, 
             servers_table.c.advertise, 
@@ -107,13 +114,14 @@ def user_servers (user_id) :
         from_obj=[servers_table.join(openttd_versions_table)],
 
         bind=get_bind()
-    ).execute()
+    ).execute())
 
-def server_create (owner, name, advertise, version) :
+def server_create (owner, url, name, version) :
     s = Server()
     s.owner = owner
+    s.url = url
     s.name = name
-    s.advertise = advertise
+    s.advertise = True
     s.status = 'offline'
     s.enabled = True
     s.version = version
@@ -140,10 +148,31 @@ def available_versions () :
             openttd_versions_table.c.id,
         ],
 
-        order_by=[openttd_versions_table.c.id],
+        order_by=[desc(openttd_versions_table.c.id)],
 
         bind=get_bind()
     ).execute()]
+
+def get_server_id_by_username (username, server_url) :
+    res = select(
+        [
+            servers_table.c.id
+        ],
+
+        and_(
+            func.lower(users_table.c.username) == username.lower(),
+            func.coalesce(func.lower(servers_table.c.url), '') == server_url.lower()
+        ),
+
+        from_obj=[users_table.join(servers_table).join(openttd_versions_table)],
+
+        bind=get_bind()
+    ).execute().fetchone()
+
+    if res :
+        return res[0]
+    else :
+        raise ValueError("No such user/server: %s/%s" % (username, server_url))
 
 climateCodeToName = {
     'normal': 'Temperate',

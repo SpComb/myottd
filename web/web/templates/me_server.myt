@@ -1,10 +1,28 @@
+<script type="text/javascript">
+    function changed () {
+        var f = document.forms[0]
+
+        var s = "<% c.user.username %>.myottd.net" + (f.url.value ? ("/" + f.url.value) : "") + " - " + f.name.value;
+
+        var d = document.getElementById("output_name");
+
+        d.innerHTML = s;
+    }
+</script>
 
 <fieldset>
     <legend>Server options</legend>
 
     <form action="<% h.url_for('me_server_edit', id=c.server_id) %>" method="POST">
-        <label for="name">Name</label>
-        <input type="text" name="name" value="<% c.server_name | h %>"/>
+        <label for="url">Url</label>
+        <input type="text" name="url" value="<% c.server_url | h %>" onchange="changed()" />
+% if c.server_config_stale and c.server_info :
+            <span class="current">"<% c.server_info['server_url'] | h %>"</span>
+% # end if
+        <br />
+
+        <label for="name">Title</label>
+        <input type="text" name="name" value="<% c.server_name | h %>" onchange="changed()" />
 % if c.server_config_stale and c.server_info :
             <span class="current">"<% c.server_info['server_name'] | h %>"</span>
 % # end if
@@ -43,6 +61,8 @@ checked="checked" \
         <strong>You must restart your server for the changes to take effect</strong>
 % # end if
     </form>
+    
+    <p class="form_hint">Server name preview: <strong id="output_name"><% c.user.username %>.myottd.net<% c.server_url and "/%s" % c.server_url or '' %> - <% c.server_name %></strong></p>
 
     <a href="<% h.url_for('me_server_config', id=c.id) %>">Edit game configuration</a>
 </fieldset>
