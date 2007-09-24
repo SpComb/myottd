@@ -174,6 +174,9 @@ def get_server_id_by_username (username, server_url) :
     else :
         raise ValueError("No such user/server: %s/%s" % (username, server_url))
 
+def get_user_by_username (username) :
+    return User.query().filter_by(func.lower(User.c.username) == username.lower()).first()
+
 climateCodeToName = {
     'normal': 'Temperate',
     'desert': 'Desert',
@@ -184,7 +187,8 @@ climateCodeToName = {
 climateNamesToCode = dict([(v, k) for k, v in climateCodeToName.iteritems()])
 
 class User (object) :
-    pass
+    def canManage (self, user) :
+        return self is user
 
 class Server (object) :
     def touch (self) :

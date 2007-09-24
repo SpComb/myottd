@@ -12,11 +12,20 @@ import sqlalchemy.exceptions
 class BaseController(WSGIController):
     def __before__ (self) :
         if 'user_id' in session :
-            c.user = model.User.get_by(id=session['user_id'])
+            c.auth_user = model.User.get_by(id=session['user_id'])
         else :
-            c.user = False
+            c.auth_user = False
+
+        c.sub_domain = request.environ['pylons.routes_dict']['sub_domain']
+
+        if c.sub_domain :
+            c.view_user = model.get_user_by_username(c.sub_domain)
+        else :
+            c.view_user = False
 
         print "sub_domain:", c.sub_domain
+        print "auth_user:", c.auth_user
+        print "view_user:", c.view_user
 
     def __call__(self, environ, start_response):
         # Insert any code to be run per request here. The Routes match
@@ -42,22 +51,56 @@ def form_handler (func, *args, **kwargs) :
 
 @decorator
 def require_login (func, *args, **kwargs) :
-    if c.user :
+    if c.auth_user and c.view_user and c.auth_user.canManage(c.view_user) :
         return func(*args, **kwargs)
     else :
-        h.redirect_to('login', sub_domain=c.sub_domain)
+        h.redirect_to('login')
 
 @decorator
 def validate_id (func, id, *args, **kwargs) :
-    print "sub_domain:", c.sub_domain
-
-    if c.user :
-        if model.Server.get_by(id=id).owner == c.user.id :
+    if c.auth_user and c.view_user and c.auth_user.canManage(c.view_user) :
+        if c.view_user and c.auth_user.canManage(c.view_user) :
             return func(id, *args, **kwargs)
         else :
             return Response("Not your server")
     else :
-        h.redirect_to('login', sub_domain=c.sub_domain)
+        h.redirect_to('login')
+
+# who gives
+import md5
+import time
+import datetime
+import random
+import os
+from myghtyutils.session import Session
+from paste.deploy import CONFIG
+
+COOKIE_DOMAIN = CONFIG.current_conf()['app_conf']['cookie_domain']
+
+def _my_create_id (self) :
+    # copy-pasted from session.py
+    self.id = md5.new(
+        md5.new("%f%s%f%d" % (time.time(), id({}), random.random(), os.getpid()) ).hexdigest(), 
+    ).hexdigest()
+    self.is_new = True
+    if self.use_cookies:
+        self.cookie[self.key] = self.id
+        self.cookie[self.key]['path'] = '/'
+        self.cookie[self.key]["domain"] = COOKIE_DOMAIN
+        if self.cookie_expires is not True:
+            if self.cookie_expires is False:
+                expires = datetime.datetime.fromtimestamp( 0x7FFFFFFF )
+            elif isinstance(self.cookie_expires, datetime.timedelta):
+                expires = datetime.datetime.today() + self.cookie_expires
+            elif isinstance(self.cookie_expires, datetime.datetime):
+                expires = self.cookie_expires
+            else:
+                raise ValueError("Invalid argument for cookie_expires: %s" % repr(self.cookie_expires))
+            self.cookie[self.key]['expires'] = expires.strftime("%a, %d-%b-%Y %H:%M:%S GMT" )
+        
+        self.request.headers_out.add('set-cookie', self.cookie[self.key].output(header=''))
+
+Session._create_id = _my_create_id
 
 # Include the '_' function in the public names
 __all__ = [__name for __name in locals().keys() if not __name.startswith('_') \

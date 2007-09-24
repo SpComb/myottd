@@ -2,7 +2,7 @@
     function changed () {
         var f = document.forms[0]
 
-        var s = "<% c.user.username %>.myottd.net" + (f.url.value ? ("/" + f.url.value) : "") + " - " + f.name.value;
+        var s = "<% c.view_user.username %>.myottd.net" + (f.url.value ? ("/" + f.url.value) : "") + " - " + f.name.value;
 
         var d = document.getElementById("output_name");
 
@@ -62,7 +62,7 @@ checked="checked" \
 % # end if
     </form>
     
-    <p class="form_hint">Server name preview: <strong id="output_name"><% c.user.username %>.myottd.net<% c.server_url and "/%s" % c.server_url or '' %> - <% c.server_name %></strong></p>
+    <p class="form_hint">Server name preview: <strong id="output_name"><% c.view_user.username %>.myottd.net<% c.server_url and "/%s" % c.server_url or '' %> - <% c.server_name %></strong></p>
 
     <a href="<% h.url_for('me_server_config', id=c.id) %>">Edit game configuration</a>
 </fieldset>

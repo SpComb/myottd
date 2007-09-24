@@ -11,7 +11,7 @@
     </tr>
 %   for id, url, name, port, advertise, status, version in c.user_servers :
     <tr>
-        <td><a href="<% h.url_for('me_server', id=id) %>"><% h.serverName(c.user.username, url, name) %></a></td>
+        <td><a href="<% h.url_for('admin_server', id=id, sub_domain=c.sub_domain) %>"><% h.serverName(c.view_user.username, url, name) %></a></td>
         <td><% port %></td>
         <td><% advertise %></td>
         <td><% status.title() %></td>
@@ -27,7 +27,7 @@
     function changed () {
         var f = document.forms[0]
 
-        var s = "<% c.user.username %>.myottd.net" + (f.url.value ? ("/" + f.url.value) : "") + " - " + f.name.value;
+        var s = "<% c.view_user.username %>.myottd.net" + (f.url.value ? ("/" + f.url.value) : "") + " - " + f.name.value;
 
         var d = document.getElementById("output_name");
 
@@ -38,7 +38,7 @@
 <fieldset>
     <legend>Create Server</legend>
 
-    <form action="<% h.url_for('me_server_add') %>" method="POST">
+    <form action="<% h.url_for('admin_server_add') %>" method="POST">
         <label for="url">Url</label>
         <input type="text" name="url" onchange="changed()" />
         <span class="hint">letters, numbers, some punctuation only, may be blank</span>
@@ -63,7 +63,7 @@
 
         <input type="submit" value="Add" />
 
-        <p class="form_hint">Server name: <strong id="output_name"><% c.user.username %>.myottd.net/&lt;url&gt; - &lt;title&gt;</strong></p>
+        <p class="form_hint">Server name: <strong id="output_name"><% c.view_user.username %>.myottd.net/&lt;url&gt; - &lt;title&gt;</strong></p>
     </form>
 </fieldset>
 

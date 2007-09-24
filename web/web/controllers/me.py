@@ -9,8 +9,8 @@ class MeController (BaseController) :
 #        super(MeController, self).__before__()
     
     @require_login
-    def index (self) :
-       c.user_servers = model.user_servers(c.user.id)
+    def index (self, sub_domain) :
+       c.user_servers = model.user_servers(c.view_user.id)
        c.available_versions = model.available_versions()
 
        return render_response('me_index.myt') 
@@ -20,7 +20,7 @@ class MeController (BaseController) :
     def server_add (self) :
         s = model.server_create(c.user.id, request.params['url'], request.params['name'], int(request.params.get('version')))
         
-        h.redirect_to('me_server', id=s.id)
+        h.redirect_to('admin_server', id=s.id)
     
     @validate_id
     def server (self, id) :
@@ -53,7 +53,7 @@ class MeController (BaseController) :
 
             server.touch()
         
-        h.redirect_to('me_server', id=id)
+        h.redirect_to('admin_server', id=id)
     
     @validate_id
     def new_random (self, id) :
@@ -68,7 +68,7 @@ class MeController (BaseController) :
 
         rpc.invoke('config_apply', id=id, config=opts, start_new=True)
 
-        h.redirect_to('me_server', id=id)
+        h.redirect_to('admin_server', id=id)
 
     @validate_id
     def savegames (self, id) :
@@ -84,7 +84,7 @@ class MeController (BaseController) :
 
                     rpc.invoke('load_game', id=id, game=game_id, save=save_id)
         
-        h.redirect_to('me_server', id=id)
+        h.redirect_to('admin_server', id=id)
 
     def config_view (self, id) :
         c.config, c.diff, c.diff_levels = rpc.invoke('config', id=id)
