@@ -53,7 +53,7 @@ def simple_servers_list () :
 
         from_obj=[users_table.join(servers_table).join(openttd_versions_table)],
 
-        order_by=[asc(servers_table.c.owner)],
+        order_by=[servers_table.c.owner, servers_table.c.url, servers_table.c.name],
 
         bind=get_bind()
     ).execute()

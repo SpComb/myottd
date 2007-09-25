@@ -77,7 +77,7 @@ class StopQuery (RpcResource) :
         reply(request, 'stop', 'ok')
 
 class RestartQuery (RpcResource) :
-    def render_RPC (self, request, id, sg) :
+    def render_RPC (self, request, id, sg=None) :
         defer.maybeDeferred(self.main.restartServer, int(id), sg).addCallback(self.restarted, request).addErrback(self.failure, request)
 
     def restarted (self, ret, request) :

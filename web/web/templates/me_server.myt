@@ -13,7 +13,7 @@
 <fieldset>
     <legend>Server options</legend>
 
-    <form action="<% h.url_for('me_server_edit', id=c.server_id) %>" method="POST">
+    <form action="<% h.url_for('admin_server_edit', id=c.server_id) %>" method="POST">
         <label for="url">Url</label>
         <input type="text" name="url" value="<% c.server_url | h %>" onchange="changed()" />
 % if c.server_config_stale and c.server_info :
@@ -64,13 +64,13 @@ checked="checked" \
     
     <p class="form_hint">Server name preview: <strong id="output_name"><% c.view_user.username %>.myottd.net<% c.server_url and "/%s" % c.server_url or '' %> - <% c.server_name %></strong></p>
 
-    <a href="<% h.url_for('me_server_config', id=c.id) %>">Edit game configuration</a>
+    <a href="<% h.url_for('admin_server_config', id=c.id) %>">Edit game configuration</a>
 </fieldset>
 
 <fieldset>
     <legend>Controls</legend>
 
-    <form action="<% h.url_for('me_server_edit', id=c.server_id) %>" method="POST">
+    <form action="<% h.url_for('admin_server_edit', id=c.server_id) %>" method="POST">
         <label for="status">Status</label>
         <span id="status"><% c.server_status %></span>
         <br />
@@ -92,7 +92,7 @@ checked="checked" \
 <fieldset>
     <legend>Start new random game</legend>
 
-    <form action="<% h.url_for('me_server_newrandom', id=c.server_id) %>" method="POST">
+    <form action="<% h.url_for('admin_server_newrandom', id=c.server_id) %>" method="POST">
         <label for="gameopt.landscape">Climate</label>
         <select name="gameopt.landscape">
             <% h.options_for_select(h.climate_opts, c.server_info.get('climate', None)) %>
@@ -120,7 +120,7 @@ checked="checked" \
 <fieldset>
     <legend>Savegames</legend>
     
-    <form action="<% h.url_for('me_server_savegames', id=c.server_id) %>" method="POST">
+    <form action="<% h.url_for('admin_server_savegames', id=c.server_id) %>" method="POST">
         <input type="submit" name="save" value="Save" />
         <br/>
 

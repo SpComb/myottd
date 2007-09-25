@@ -1,6 +1,6 @@
 <h1>Configuration of server <% c.server_name | h %></h1>
 
-<form action="<% h.url_for('me_server_config', id=c.id) %>" method="POST">
+<form action="<% h.url_for('admin_server_config', id=c.id) %>" method="POST">
 
 % gameopt_currency = None
 % cust_diff_values = None
@@ -120,6 +120,6 @@ multiple="multiple" \
 
 <input type="submit" value="Apply Config" /> <strong>Applying the configuration will cause the server to restart</strong>
 </form>
-<form action="<% h.url_for('me_server', id=c.id) %>" method="GET"><input type="submit" value="Cancel" /></form>
+<form action="<% h.url_for('admin_server', id=c.id) %>" method="GET"><input type="submit" value="Cancel" /></form>
 
 
