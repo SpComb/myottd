@@ -11,6 +11,7 @@
     
     <table>
 %   for name, type, type_data, value, desc in patches :
+%       meta = None
 %       if name == "gameopt.diff_custom" :
 %           cust_diff_values = value
 %           continue
@@ -30,8 +31,11 @@ checked="checked" \
 %           # end if
 >
 %           value = value and 'On' or 'Off'
+%           meta = type_data and 'On' or 'Off'
 %       elif type == 'int' :
         <input type="text" name="i_<% name %>" value="<% value %>" />
+%           min, default, max = type_data
+%           meta = "%d &#8804; %d &#8804; %d" % (min, default, max)
 %       elif type == 'str' :
         <input type="text" name="t_<% name %>" value="<% value %>" />
 %       elif type == 'intlist' :
@@ -46,21 +50,28 @@ multiple="multiple" \
 >
                 <% h.options_for_select(type_data[1], value) %>
             </select>            
+%           meta = type_data[1][type_data[0]]
 %       else :
 %           raise ValueError(type)
 %       # end if
             </td>
+            <td class="meta">
+%       if meta :
+            <% meta.replace('-1 ', '? ') %>
+%       else :
+            &nbsp;
+%       # end if            
+            </td>
             <td>
 %       if desc :            
 %           if '%s' in desc :
-        <% desc % str(value) %>
+        <% desc % str(value) | h %>
 %           else :
-        <% desc %>
+        <% desc | h %>
 %           # end if        
 %       else :
-        <% name %>
-%       # end if        
-            </td>
+        <% name | h %>
+%       # end if
         </tr>
 
 %   # end fpr
