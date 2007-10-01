@@ -1,4 +1,4 @@
-<h1>Configuration of server <% c.server_name | h %></h1>
+<h1>OpenTTD Configuration</h1>
 
 <form action="<% h.url_for('admin_server_config', id=c.id) %>" method="POST">
 
@@ -24,8 +24,8 @@
         <tr>
             <td class="value">
 %       if type == 'bool' :
-        <input type="hidden" name="bb_<% name %>" value="0" />
-        <input type="checkbox" name="b_<% name %>" value="1" class="checkbox" \
+                <input type="hidden" name="bb_<% name %>" value="0" />
+                <input type="checkbox" name="b_<% name %>" value="1" class="checkbox" \
 %           if value :
 checked="checked" \
 %           # end if
@@ -33,23 +33,23 @@ checked="checked" \
 %           value = value and 'On' or 'Off'
 %           meta = type_data and 'On' or 'Off'
 %       elif type == 'int' :
-        <input type="text" name="i_<% name %>" value="<% value %>" />
+                <input type="text" name="i_<% name %>" value="<% value %>" />
 %           min, default, max = type_data
 %           meta = "%d &#8804; %d &#8804; %d" % (min, default, max)
 %       elif type == 'str' :
-        <input type="text" name="t_<% name %>" value="<% value %>" />
+                <input type="text" name="t_<% name %>" value="<% value %>" />
 %       elif type == 'intlist' :
 %           for i, v in enumerate(value) :
-        <input type="text" name="il_<% name %>_<% i %>" value="<% v %>" class="thin" />
+                <input type="text" name="il_<% name %>_<% i %>" value="<% v %>" class="thin" />
 %           # end for
 %       elif type in ('omany', 'mmany') :
-            <select name="<% type[0] %>m_<% name %>" \
+                <select name="<% type[0] %>m_<% name %>" \
 %           if type == 'mmany' :
 multiple="multiple" \
 %           # end if
 >
-                <% h.options_for_select(type_data[1], value) %>
-            </select>            
+                    <% h.options_for_select(type_data[1], value) %>
+                </select>            
 %           meta = type_data[1][type_data[0]]
 %       else :
 %           raise ValueError(type)
@@ -57,23 +57,23 @@ multiple="multiple" \
             </td>
             <td class="meta">
 %       if meta :
-            <% meta.replace('-1 ', '? ') %>
+                <% meta.replace('-1 ', '? ') %>
 %       else :
-            &nbsp;
+                &nbsp;
 %       # end if            
             </td>
             <td>
 %       if desc :            
 %           if '%s' in desc :
-        <% desc % str(value) | h %>
+                <% desc % str(value) | h %>
 %           else :
-        <% desc | h %>
+                <% desc | h %>
 %           # end if        
 %       else :
-        <% name | h %>
+                <% name | h %>
 %       # end if
+            </td>
         </tr>
-
 %   # end fpr
     </table>
 </fieldset>

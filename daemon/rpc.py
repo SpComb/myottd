@@ -136,6 +136,13 @@ class LoadGameQuery (RpcResource) :
     def _done (self, res, r) :
         reply(r, 'load_game', res)
 
+class LoadSaveQuery (RpcResource) :
+    def render_RPC (self, r, id, name) :
+        self.main.servers[int(id)].loadCustom(name).addCallback(self._done, r).addErrback(self.failure, r)
+
+    def _done (self, res, r) :
+        reply(r, 'load_save', res)
+
 class ConfigQuery (RpcResource) :
     def render_RPC (self, r, id) :
         reply(r, 'config', self.main.servers[int(id)].getConfig())
@@ -146,6 +153,13 @@ class ConfigApplyQuery (RpcResource) :
 
     def _done (self, res, r) :
         reply(r, 'config_apply', res)
+
+class NewgrfsQuery (RpcResource) :
+    def render_RPC (self, r, id, newgrfs) :
+        self.main.servers[int(id)].applyNewgrfs(newgrfs).addCallback(self._done, r).addErrback(self.failure, r)
+
+    def _done (self, res, r) :
+        reply(r, 'newgrfs', res)
 
 class DebugQuery (RpcResource) :
     def render_RPC (self, request) :
@@ -167,6 +181,8 @@ class Site (server.Site) :
         root.putChild('load_game', LoadGameQuery(main))
         root.putChild('config', ConfigQuery(main))
         root.putChild('config_apply', ConfigApplyQuery(main))
+        root.putChild('newgrfs', NewgrfsQuery(main))
+        root.putChild('load_save', LoadSaveQuery(main))
 
         server.Site.__init__(self, root)
 

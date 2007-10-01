@@ -16,10 +16,7 @@
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 from web.lib.base import *
-
-def validate (id) :
-     if c.user and id and model.Server.get_by(id=id).owner != c.user.id :
-        raise Exception("server's not yours")
+import re
 
 class MeController (BaseController) :
 #    def __before__ (self) :
@@ -89,7 +86,25 @@ class MeController (BaseController) :
 
     @validate_id
     def savegames (self, id) :
-        if request.params.get('save', False) :
+        file = request.params.get('upload', '')
+
+        if file != '' :
+            if re.match('[a-z0-9_, -]+.sav', file.filename, re.I) :
+                server_info = rpc.server_info(id)
+
+                save_path = server_info['custom_save_path']
+
+                from shutil import copyfileobj
+                
+                fh = open(save_path, 'w')
+                copyfileobj(file.file, fh)
+                fh.close()
+
+                rpc.invoke('load_save', id=id, name=file.filename)
+            else :
+                raise ValueError("Invalid NewGRF filename: `%s'. Must match [a-z0-9_-]+.grf" % file.filename)
+
+        elif request.params.get('save', False) :
             rpc.invoke('save_game', id=id)
 
         else :
@@ -155,4 +170,36 @@ class MeController (BaseController) :
         c.changed = rpc.invoke('config_apply', id=id, config=config)
         
         return render_response('me_server_config_applied.myt')
+    
+    @validate_id
+    @form_handler
+    def newgrfs (self, id) :
+        file = request.params.get('upload', '')
+
+        if file != '' :
+            if re.match('[a-z0-9_-]+.grf', file.filename, re.I) :
+                server_info = rpc.server_info(id)
+
+                newgrf_path = server_info['newgrf_path']
+
+                from shutil import copyfileobj
+                
+                fh = open("%s/%s" % (newgrf_path, file.filename), 'w')
+                copyfileobj(file.file, fh)
+                fh.close()
+            else :
+                raise ValueError("Invalid NewGRF filename: `%s'. Must match [a-z0-9_-]+.grf" % file.filename)
+        else :
+            newgrfs = []
+
+            for newgrf in request.params.getall('newgrfs[]') :
+                enabled = bool(request.params.get('%s_enabled' % newgrf, False))
+                params = request.params.get('%s_params' % newgrf)
+                
+                if enabled :
+                    newgrfs.append((newgrf, params))
+            
+            rpc.invoke('newgrfs', id=id, newgrfs=newgrfs)
+
+        h.redirect_to('admin_server', id=id, anchor="newgrfs")
 

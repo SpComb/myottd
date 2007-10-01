@@ -64,21 +64,19 @@
             Random map
         </td>
     </tr>
-<!--   
     <tr>
         <th>Climate</th>
         <td>
-            <% False and h.climateName(s['climate']) %>    
+            <% h.climateName(s['climate']) %>    
         </td>
     </tr>
     <tr>
         <th>Map size</th>
         <td>
-            <% False and h.mapSize(s['map_x']) %> x <% False and h.mapSize(s['map_y']) %>
+            <% h.mapSize(s['map_x']) %> x <% h.mapSize(s['map_y']) %>
         </td>
     </tr>
--->
-%       else :
+%       elif s['save_date'] or s['game_id'] is not None :
             Savegame
         </td>
     </tr>
@@ -90,6 +88,20 @@
 %           else :           
             Game <% s['game_id'] %> - <% h.fmtDatestamp(s['save_date']) %>
 %           # end if            
+        </td>
+    </tr>
+%       elif s['custom_save'] :
+            Uploaded savegame
+        </td>
+    <tr>
+    <tr>
+        <th>Savegame</th>
+        <td>
+            <% s['custom_save'] | h %>
+        </td>
+    </tr>
+%       else :
+            ???
         </td>
     </tr>
 %       # end if

@@ -42,6 +42,7 @@
         <td>
             <a href="<% h.url_for('server', sub_domain=s['owner'], url=s['server_url']) %>"><% s['server_url'] and "%s - " % s['server_url'] or '' %><% s['server_name'] %></a>
         </td>
+%   if s['running'] :        
         <td>
             <% s['cur_clients'] %> / <% s['max_clients'] %>
         </td>
@@ -52,10 +53,13 @@
             <% s['version'] %>
         </td>
         <td>
-%   if s['has_password'] :
+%       if s['has_password'] :
             [password]
-%   # end if
+%       # end if
         </td>
+%   else :
+        <td colspan="4"></td>
+%   # end if
     </tr>
 % # end for
 </table>

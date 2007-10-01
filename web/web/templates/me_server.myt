@@ -120,7 +120,7 @@ checked="checked" \
 <fieldset>
     <legend>Savegames</legend>
     
-    <form action="<% h.url_for('admin_server_savegames', id=c.server_id) %>" method="POST">
+    <form action="<% h.url_for('admin_server_savegames', id=c.server_id) %>" method="POST" enctype="multipart/form-data">
         <input type="submit" name="save" value="Save" />
         <br/>
 
@@ -160,8 +160,55 @@ checked="checked" \
             </td>
         </tr>
 %       # end if
-%   # end if
+%   # end for
     </table>
+    
+    <hr style="margin: 10px 0px 10px 0px;" />
+    
+    <label for="upload">Upload Savegame</label>
+    <input type="file" name="upload" />
+    <br/>
+
+    <input type="submit" value="Upload" />
+
+
+    </form>
+</fieldset>
+
+<fieldset id="newgrfs">
+    <legend>NewGRFs</legend>
+    
+    <form action="<% h.url_for('admin_server_newgrfs', id=c.id) %>" method="POST" enctype="multipart/form-data">
+%   if s['newgrfs'] :
+    <table class="newgrfs">
+        <tr>
+            <th>Enabled</th>
+            <th>NewGRF name</th>
+            <th>Params</th>
+        </tr>
+%       for filename, loaded, params in s['newgrfs'] :
+        <tr>
+            <input type="hidden" name="newgrfs[]" value="<% filename %>" />
+            <td><input type="checkbox" name="<% filename %>_enabled" <% loaded and 'checked="checked" ' or '' %>value="1" class="checkbox" /></td>
+            <td><% filename %></td>
+            <td><input type="text" name="<% filename %>_params" value="<% params or '' %>"></td>
+        </tr>
+%       # end for
+        <tr>
+            <td colspan="3"><input type="submit" value="Apply" %> <span class="hint">will cause server restart</span></td>
+        </tr>
+    </table>
+%   else :
+    <strong>No NewGRFs loaded</strong>
+%   # end if    
+
+    <hr style="margin: 10px 0px 10px 0px;" />
+    
+    <label for="upload">Upload GRF</label>
+    <input type="file" name="upload" />
+    <br/>
+
+    <input type="submit" value="Upload" />
 
     </form>
 </fieldset>

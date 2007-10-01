@@ -71,6 +71,29 @@ HIDDEN_SETTINGS = (
     ("interface", "*"),
 )
 
+BUILTIN_NEWGRFS = [
+    'sample.cat',
+    'trg1r.grf',
+    'trgcr.grf',
+    'trghr.grf',
+    'trgir.grf',
+    'trgtr.grf',
+    '2ccmap.grf',
+    'airports.grf',
+    'autorail.grf',
+    'canalsw.grf',
+    'dosdummy.grf',
+    'elrailsw.grf',
+    'nsignalsw.grf',
+    'openttd.grf',
+    'opntitle.dat',
+    'trkfoundw.grf'
+]
+
+# monkey-patch ConfigParser to not fail on value-less settings
+ConfigParser.RawConfigParser.OPTCRE = re.compile(r'(?P<option>[^:=\s][^:=]*)\s*(?P<vi>[:=]?)\s*(?P<value>.*)$')
+ConfigParser.RawConfigParser.optionxform = str
+
 def ignoreResult (callable) :
     def _wrap (*args) :
         callable()
@@ -108,6 +131,7 @@ class Openttd (protocol.ProcessProtocol) :
         self.game_id = None
         self.save_date = None
         self.random_map = None
+        self.custom_save = None
         
         self.out_queue = []
         self.out_wait = False
@@ -413,6 +437,37 @@ class Openttd (protocol.ProcessProtocol) :
             ret.append((cat_name, out))
 
         return ret, diff_settings, diff_levels
+
+    def applyNewgrfs (self, newgrfs) :
+        """
+            Modify the config file to run the specified set of newgrfs
+        """
+ 
+        if self.running :
+            return self.stop().addCallback(self._doApplyNewgrfs_stopped, newgrfs, True)
+        else :
+            return self._doApplyNewgrfs_stopped(None, new_config, False)
+
+    def _doApplyNewgrfs_stopped (self, res, newgrfs, start) :
+        config = ConfigParser.RawConfigParser()
+        config.read(['%s/openttd.cfg' % self.path])
+        
+        config.remove_section('newgrf')
+        config.add_section('newgrf')
+        
+        self.log("applying newgrfs: %s" % (newgrfs, ))
+        for newgrf, params in newgrfs :
+            config.set('newgrf', newgrf, params)
+
+        self._writeConfigObj(config)
+
+        if start :
+            return self.start().addCallback(self._doApplyNewgrfs_started)
+        else :
+            return defer.succeed(None)
+
+    def _doApplyNewgrfs_started (self, _) :
+        return None
 
     def applyConfig (self, new_config, start_new=False) :
         """
@@ -775,14 +830,44 @@ class Openttd (protocol.ProcessProtocol) :
             server_port=self.port,
             version=self.version,
             has_password=bool(self.password),
-#            climate=self.game_climate,
-#            map_x=self.map_x,
-#            map_y=self.map_y,
             password=self.password,
             game_id=self.game_id,
             save_date=self.save_date,
             is_random_map=self.random_map,
+            custom_save=self.custom_save,
+            custom_save_path="%s/save/custom.sav" % self.path,
         )
+        
+        # stuff from the config file
+        config = ConfigParser.RawConfigParser()
+        config.read(['%s/openttd.cfg' % self.path])
+        
+        # misc
+        d['climate'] = config.get('gameopt', 'landscape')
+        d['map_x'] = config.getint('patches', 'map_x')
+        d['map_y'] = config.getint('patches', 'map_y')
+
+        # newgrf info
+        cfg_grfs = {}
+        for name, params in config.items('newgrf') :
+            cfg_grfs[name] = params
+        
+        # from the filesystem
+        newgrf_path = d['newgrf_path'] = "%s/data" % self.path
+        newgrfs = d['newgrfs'] = []
+
+        for fname in os.listdir(newgrf_path) :
+            if fname in BUILTIN_NEWGRFS :
+                continue
+
+            if fname in cfg_grfs :
+                params = cfg_grfs[fname]
+                loaded = True
+            else :
+                params = None
+                loaded = False
+
+            newgrfs.append((fname, loaded, params))
 
         if self.running :
             return self.queryServerInfo().addCallback(self._serverOverviewGotInfo, d)
@@ -911,7 +996,7 @@ class Openttd (protocol.ProcessProtocol) :
         """
             Continue the given game, loading either the given savegame, or the newest one
         """
-        
+
         if not save_date :
             save_date, save_dir, save_fname = self._getNewestSave(game_id)
         else :
@@ -931,6 +1016,7 @@ class Openttd (protocol.ProcessProtocol) :
         self.game_id = game_id
         self.save_date = save_date
         self.random_map = False
+        self.custom_save = None
 
         return dict(game_id=game_id, save_date=save_date)
     
@@ -941,11 +1027,38 @@ class Openttd (protocol.ProcessProtocol) :
         self.game_id = game_id
         self.save_date = save_date
         self.random_map = False
+        self.custom_save = None
 
         return self.cmdCd("..").addCallback(self._doLoadGame_done, dict(game_id=game_id, save_date=save_date))
 
     def _doLoadGame_done (self, res, ret) :
         return ret
+
+    def loadCustom (self, name) :
+        """
+            Load the 'custom' savegame file, saveing the current game if it exists
+        """
+        self.log("loading custom savegame")
+
+        if self.game_id :
+            self.log("saveing current game")
+            return self.saveGame().addCallback(self._doLoadCustom_load, name)
+        else :
+            return self._doLoadCustom_load(None, name)
+
+    def _doLoadCustom_load (self, res, name) :
+        if self.running :
+            return self.cmdLoad('custom').addCallback(self._doLoadCustom_loaded, name)
+        else :
+            return self.start(sg="%s/save/custom" % self.path).addCallback(self._doLoadCustom_loaded, name)
+
+    def _doLoadCustom_loaded (self, res, name) :
+        self.game_id = None
+        self.save_id = None
+        self.random_map = None
+        self.custom_save = name
+
+        return None
 
 def failure (failure) :
     print 'FAILURE: %s' % failure

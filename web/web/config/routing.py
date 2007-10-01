@@ -47,6 +47,7 @@ def make_map (global_conf={}, app_conf={}) :
     map.connect('admin_server_savegames',   '/admin/:id/savegames', controller='me', action='savegames', conditions=dict(method='POST', sub_domain=True))
     map.connect('admin_server_config',      '/admin/:id/config', controller='me', action='config_view', conditions=dict(method='GET', sub_domain=True))
     map.connect('admin_server_config_post', '/admin/:id/config', controller='me', action='config_apply', conditions=dict(method='POST', sub_domain=True))
+    map.connect('admin_server_newgrfs',     '/admin/:id/newgrf', controller='me', action='newgrfs', conditions=dict(method='POST', sub_domain=True))
     
     map.connect('user',                     '/', controller='my_user', action='index', conditions=dict(sub_domain=True))
     map.connect('server',                   '/*url', controller='my_user', action='view_server', conditions=dict(sub_domain=True))
