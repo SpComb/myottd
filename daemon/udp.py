@@ -316,8 +316,14 @@ def main () :
     from getopt import getopt
 
     argv.pop(0)
-    host = argv.pop(0, None)
-    port = argv.pop(0, 3979)
+    host = None
+    port = 3979
+
+    try :
+        host = argv[0]
+        port = argv[1]
+    except IndexError :
+        pass
 
     poller = Poller()
     
@@ -333,8 +339,11 @@ def _main_gotInfo ((host, port, info), poller) :
     
 def _main_gotDetails ((host, port, details), poller, info) :
     print details
-
-    poller.getNewGrfs(host, port, info.newgrf_info.newgrfs).addCallback(_main_gotNewgrfs, poller, info, details)
+    
+    if info.newgrf_info.newgrfs :
+        poller.getNewGrfs(host, port, info.newgrf_info.newgrfs).addCallback(_main_gotNewgrfs, poller, info, details)
+    else :
+        reactor.stop()
 
 def _main_gotNewgrfs ((host, port, newgrfs), poller, info, details) :
     print newgrfs
@@ -353,15 +362,17 @@ def _main_gotServers (servers, poller) :
 def _main_gotInfos (infos, poller) :
     for status, (host, port, info) in infos :
         if status and info :
-            print "%s:%d: %s - %dx%d - %s - " % (host, port, info.basic.name, info.basic.map_width, info.basic.map_height, info.basic.revision),
+            print "%15s:%-5d : %4dx%-4d - %15s - " % (host, port, info.basic.map_width, info.basic.map_height, info.basic.revision),
 
             if info.ext_date :
                 get_details_from = host, port, info
-                print "date:[%s @ %s]" % (info.ext_date.start, info.ext_date.current)
+                print "%10s -> %-10s" % (info.ext_date.start, info.ext_date.current),
             else :
-                print "olddate:[%s @ %s]" % (info.basic.old_date.start, info.basic.old_date.current)
+                print "%s -> %s" % (info.basic.old_date.start, info.basic.old_date.current),
+
+            print " - %s" % (info.basic.name)
         else :
-            print "%s:%d: failed" % (host, port)
+            print "%15s:%-5d : failed" % (host, port)
     
     reactor.stop()
 
