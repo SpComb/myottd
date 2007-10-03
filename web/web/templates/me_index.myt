@@ -39,7 +39,7 @@
     <legend>Create Server</legend>
 
     <form action="<% h.url_for('admin_server_add') %>" method="POST">
-        <label for="url">Url</label>
+        <label for="url">Tag</label>
         <input type="text" name="url" onchange="changed()" />
         <span class="hint">letters, numbers, some punctuation only, may be blank</span>
         <br/>
@@ -63,7 +63,7 @@
 
         <input type="submit" value="Add" />
 
-        <p class="form_hint">Server name: <strong id="output_name"><% c.view_user.username %>.myottd.net/&lt;url&gt; - &lt;title&gt;</strong></p>
+        <p class="form_hint">Server name: <strong id="output_name"><% c.view_user.username %>.myottd.net/&lt;tag&gt; - &lt;title&gt;</strong></p>
     </form>
 </fieldset>
 

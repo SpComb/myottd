@@ -74,10 +74,11 @@ def require_login (func, *args, **kwargs) :
         h.redirect_to('login')
 
 @decorator
-def validate_id (func, id, *args, **kwargs) :
+def validate_id (func, self, id, *args, **kwargs) :
     if c.auth_user and c.view_user and c.auth_user.canManage(c.view_user) :
         if c.view_user and c.auth_user.canManage(c.view_user) :
-            return func(id, *args, **kwargs)
+            c.admin_server = model.Server.get_by(id=id)
+            return func(self, id, *args, **kwargs)
         else :
             return Response("Not your server")
     else :

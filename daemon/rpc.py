@@ -19,9 +19,17 @@ from twisted.web import resource, server
 from twisted.internet import protocol, reactor, defer
 import simplejson
 import traceback
+import datetime
 
 import settings
 import main
+
+class DateEncoder (simplejson.JSONEncoder) :
+    def default (self, obj) :
+        if isinstance(obj, datetime.date) :
+            return obj.strftime('%Y-%m-%d')
+        else :
+            return simplejson.JSONEncoder.default(self, obj)
 
 def writeRequest (request, type, subtype, data) :
     """
@@ -29,7 +37,7 @@ def writeRequest (request, type, subtype, data) :
     """
     request.setHeader('Content-Type', 'text/plain')
     
-    json = simplejson.dumps((type, subtype, data))
+    json = simplejson.dumps((type, subtype, data), cls=DateEncoder)
     
     request.setHeader('X-JSON', json)
 
@@ -105,16 +113,16 @@ class ServersQuery (RpcResource) :
         deferreds = []
 
         for server in self.main.servers.itervalues() :
-            deferreds.append(server.getServerOverview())
+            deferreds.append(server.rpcGetInfo())
         
         defer.DeferredList(deferreds).addCallback(self._gotInfos, request)
 
     def _gotInfos (self, infos, request) :
-        reply(request, 'servers', [info for status, info in infos if status])
+        reply(request, 'servers', [info for status, info in infos if status and info])
 
 class ServerInfoQuery (RpcResource) :
     def render_RPC (self, request, id) :
-        self.main.servers[int(id)].getServerDetails().addCallback(self._gotDetails, request).addErrback(self.failure, request)
+        self.main.servers[int(id)].rpcGetDetails().addCallback(self._gotDetails, request).addErrback(self.failure, request)
 
     def _gotDetails (self, res, request) :
         reply(request, 'server_info', res)

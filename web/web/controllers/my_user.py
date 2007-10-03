@@ -28,6 +28,7 @@ class MyUserController (BaseController) :
 
     def view_server (self, url, sub_domain) :
         c.id = model.get_server_id_by_username(sub_domain, url)
+        c.view_server = model.Server.get_by(id=c.id)
 
         c.server_info = rpc.invoke('server_info', id=c.id)
 

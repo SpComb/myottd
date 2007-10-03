@@ -24,11 +24,12 @@ import ConfigParser
 from datetime import date
 import re
 import cPickle
+import time
 
 import rpc
 import db
-import time
 from settings import BASE_PATH
+import udp
 
 SIGTERM = 15
 
@@ -120,6 +121,9 @@ class Delay (defer.Deferred) :
         self._timer = reactor.callLater(delay, self.callback, what)
 
         defer.Deferred.__init__(self)
+
+# create the poller
+poller = udp.Poller()
 
 class Openttd (protocol.ProcessProtocol) :
     def __init__ (self, main, id, *stuff) :
@@ -768,7 +772,7 @@ class Openttd (protocol.ProcessProtocol) :
     def getPlayers (self) :
         return self.command('players').addCallback(self._gotPlayers)
 
-    PLAYER_INFO_RE = re.compile("#:(\d+)\(([^)]+)\) Company Name: '([^']*)'  Year Founded: (\d+)  Money: (\d+)  Loan: (\d+)  Value: (\d+)  \(T:(\d+), R:(\d+), P:(\d+), S:(\d+)\) (un)?protected")
+    PLAYER_INFO_RE = re.compile("#:(\d+)\(([^)]+)\) Company Name: '([^']*)'  Year Founded: (\d+)  Money: (-?\d+)  Loan: (\d+)  Value: (-?\d+)  \(T:(\d+), R:(\d+), P:(\d+), S:(\d+)\) (un)?protected")
     def _gotPlayers (self, lines) :
         players = []
 
@@ -1074,6 +1078,90 @@ class Openttd (protocol.ProcessProtocol) :
         self.custom_save = name
 
         return None
+        
+    #
+    # New UDP-based status stuff
+    #
+    def rpcGetInfo (self) :
+        """
+            Return a dict with the info needed for showing this server in a list of servers
+        """
+        
+        if self.running :
+            return poller.getInfo("127.0.0.1", self.port).addCallback(self._rpcGetInfo_result)
+        else :
+            return defer.suceed(None)
+
+    def _rpcGetInfo_result (self, (host, port, info)) :
+        return dict(
+            id              = self.id,
+            owner_id        = self.owner_uid,
+            owner           = self.username,
+            tag             = self.url,
+            server_name     = info.basic.name,
+            _server_name    = self._server_name,
+            port            = port,
+            client_count    = info.basic.clients_current,
+            client_max      = info.basic.clients_max,
+            company_count   = info.ext_limits.companies_current,
+            company_max     = info.ext_limits.companies_max,
+            version         = info.basic.revision,
+            map_type        = info.basic.map_type,
+            map_width       = info.basic.map_width,
+            map_height      = info.basic.map_height,
+            date_start      = info.ext_date.start,
+            date_now        = info.ext_date.current,
+            spectator_count = info.basic.spectators_current,
+            spectator_max   = info.ext_limits.spectators_max,
+            password        = bool(info.basic.password),
+        )
+
+    def rpcGetDetails (self) :
+        """
+            Return what getInfo returns, but a LOT more details
+        """
+
+        if self.running :
+            return self.rpcGetInfo().addCallback(self._rpcGetDetails_gotInfo)
+        else :
+            return defer.succeed(None)
+
+    def _rpcGetDetails_gotInfo (self, info) :
+        return poller.getDetails("127.0.0.1", self.port).addCallback(self._rpcGetDetails_result, info)
+
+    def _rpcGetDetails_result (self, (host, port, details), info) :
+        info.update(dict(
+            companies=[dict(
+                id                  = c.id,
+                name                = c.name,
+                start_year          = c.inaugurated,
+                value               = c.company_value,
+                balance             = c.balance,
+                income              = c.income,
+                performance         = c.performance,
+                veh_trains          = c.vehicles.trains,
+                veh_trucks          = c.vehicles.trucks,
+                veh_busses          = c.vehicles.busses,
+                veh_planes          = c.vehicles.planes,
+                veh_ships           = c.vehicles.ships,
+                stn_trains          = c.stations.trains,
+                stn_trucks          = c.stations.trucks,
+                stn_busses          = c.stations.busses,
+                stn_planes          = c.stations.planes,
+                stn_ships           = c.stations.ships,
+                clients             = c.has_clients and [dict(
+                    name            = p.name,
+                    joined          = p.joined
+                ) for p in c.clients] or [],
+                password            = bool(c.password),
+            ) for c in details.players],
+            spectators=[dict(
+                name                = s.name,
+                joined              = s.joined,
+            ) for s in details.spectators],
+        ))
+
+        return info
 
 def failure (failure) :
     print 'FAILURE: %s' % failure

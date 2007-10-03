@@ -40,13 +40,7 @@ def fmtTimestamp (ts) :
     return datetime.fromtimestamp(ts).strftime("%Y/%m/%d %H:%M")
 
 def fmtDatestamp (ds) :
-    if ds == "auto" :
-        return "Auto"
-
-    if not ds :
-        return "N/A"
-
-    return date(year=int(ds[:4]), month=int(ds[4:6]), day=int(ds[6:8])).strftime("%b %d %Y")
+    return date(*[int(p) for p in ds.split('-')]).strftime("%b %d %Y")
 
 def fmtDateDict (dd) :
     return date(year=dd['year'], month=dd['month'], day=dd['day']).strftime("%b %d %Y")
@@ -67,4 +61,10 @@ def redirect_to (name, **params) :
         params['sub_domain'] = c.sub_domain
 
     return _redirect_to(name, **params)
+
+def res_url (url) :
+    return url_for('home') + url
+
+def fmtMoney (money) :
+    return number_to_currency(money, unit='&euro; ', precision=0, separator='.', delimiter=',')
 

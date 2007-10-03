@@ -22,14 +22,27 @@
 % # end if
                 </div>
                 <ul>
-                    <li><a href="<% h.url_for('home', sub_domain=None) %>">Main</a></li>
+                    <li>
+                        <a href="<% h.url_for('home', sub_domain=None) %>">MyOTTD</a>
 % if c.view_user :
-                    <li><a href="<% h.url_for('user') %>"><% c.view_user.username %></a></li>
-% # end if
-% if c.auth_user and c.auth_user.canManage(c.view_user) :
-                    <li><a href="<% h.url_for('admin') %>">Manage Servers</a></li>
+                        &raquo; <a href="<% h.url_for('user') %>"><% c.view_user.username %></a>
 % # end if
 
+% if c.admin_view :
+                        &raquo; <a href="<% h.url_for('admin') %>">Manage Servers</a>
+%   if c.admin_server :
+                        &raquo; <a href="<% h.url_for('admin_server', id=c.admin_server.id) %>"><% c.admin_server.name | h %></a>
+%       if c.admin_subview_name and c.admin_subview_title :
+                        &raquo; <a href="<% h.url_for(c.admin_subview_name, id=c.admin_server.id) %>"><% c.admin_subview_title %></a>
+%       # end if
+%   # end if
+% elif c.view_server :
+                         &raquo; <a href="<% h.url_for('server', id=c.view_server.id) %>"><% c.view_server.name | h %></a>
+% # end if
+                    </li>
+% if c.auth_user and c.auth_user.canManage(c.view_user) and not c.admin_view :
+                    <li><a href="<% h.url_for('admin') %>">Manage Servers</a></li>
+% # end if
                 </ul>
             </div>
             <div id='content'>

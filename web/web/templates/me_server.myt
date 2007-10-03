@@ -14,7 +14,7 @@
     <legend>Server options</legend>
 
     <form action="<% h.url_for('admin_server_edit', id=c.server_id) %>" method="POST">
-        <label for="url">Url</label>
+        <label for="url">Tag</label>
         <input type="text" name="url" value="<% c.server_url | h %>" onchange="changed()" />
 % if c.server_config_stale and c.server_info :
             <span class="current">"<% c.server_info['server_url'] | h %>"</span>
@@ -165,11 +165,11 @@ checked="checked" \
     
     <hr style="margin: 10px 0px 10px 0px;" />
     
-    <label for="upload">Upload Savegame</label>
+    <label for="upload">Load Savegame</label>
     <input type="file" name="upload" />
     <br/>
 
-    <input type="submit" value="Upload" />
+    <input type="submit" value="Load" />
 
 
     </form>

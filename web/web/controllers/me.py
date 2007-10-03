@@ -22,6 +22,11 @@ class MeController (BaseController) :
 #    def __before__ (self) :
 #        super(MeController, self).__before__()
     
+    def __before__ (self) :
+        super(MeController, self).__before__()
+
+        c.admin_view = True
+
     @require_login
     def index (self, sub_domain) :
        c.user_servers = model.user_servers(c.view_user.id)
@@ -117,9 +122,13 @@ class MeController (BaseController) :
                     rpc.invoke('load_game', id=id, game=game_id, save=save_id)
         
         h.redirect_to('admin_server', id=id)
-
+    
+    @validate_id
     def config_view (self, id) :
         c.config, c.diff, c.diff_levels = rpc.invoke('config', id=id)
+
+        c.admin_subview_name = 'admin_server_config'
+        c.admin_subview_title = "Game Configuration"
 
         return render_response('me_server_config.myt')
     
