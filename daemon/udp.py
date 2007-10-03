@@ -292,7 +292,7 @@ class Poller (protocol.DatagramProtocol) :
         d.callback((host, port, details))
 
     def getNewGrfs (self, host, port, grf_list) :
-        self.log("sending newgrfs query to %s:%s for: %s", host, port, grf_list)
+        self.log("sending newgrfs query to %s:%s for: %s", host, port, ' '.join([grf.grfid for grf in grf_list]))
 
         header = c.Container(type='UDP_CLIENT_GET_NEWGRFS', size=4+(20)*len(grf_list))
         req = c.Container(header=header, newgrf_count=len(grf_list), newgrfs=grf_list)
@@ -312,18 +312,34 @@ class Poller (protocol.DatagramProtocol) :
         print 'udp: %s' % (msg, )
 
 def main () :
-    poller = Poller()
+    from sys import argv
+    from getopt import getopt
 
-    host, port = "88.198.193.138", 3979
+    argv.pop(0)
+    host = argv.pop(0, None)
+    port = argv.pop(0, 3979)
+
+    poller = Poller()
     
-    poller.getInfo(host, port).addCallback(_main_gotInfo, poller)
+    if host and port :
+        poller.getInfo(host, port).addCallback(_main_gotInfo, poller)
+    else :
+        poller.getServers().addCallback(_main_gotServers, poller)
 
 def _main_gotInfo ((host, port, info), poller) :
     print info
 
     poller.getDetails(host, port).addCallback(_main_gotDetails, poller, info)
     
-    #poller.getServers().addCallback(_main_gotServers, poller)
+def _main_gotDetails ((host, port, details), poller, info) :
+    print details
+
+    poller.getNewGrfs(host, port, info.newgrf_info.newgrfs).addCallback(_main_gotNewgrfs, poller, info, details)
+
+def _main_gotNewgrfs ((host, port, newgrfs), poller, info, details) :
+    print newgrfs
+
+    reactor.stop()
 
 def _main_gotServers (servers, poller) :
     ds = []
@@ -335,8 +351,6 @@ def _main_gotServers (servers, poller) :
     defer.DeferredList(ds).addCallback(_main_gotInfos, poller)
 
 def _main_gotInfos (infos, poller) :
-    get_details_from = None
-
     for status, (host, port, info) in infos :
         if status and info :
             print "%s:%d: %s - %dx%d - %s - " % (host, port, info.basic.name, info.basic.map_width, info.basic.map_height, info.basic.revision),
@@ -349,16 +363,6 @@ def _main_gotInfos (infos, poller) :
         else :
             print "%s:%d: failed" % (host, port)
     
-    poller.getDetails(*get_details_from[:2]).addCallback(_main_gotDetails, poller, get_details_from[2])
-
-def _main_gotDetails ((host, port, details), poller, info) :
-    print details
-
-    poller.getNewGrfs(host, port, info.newgrf_info.newgrfs).addCallback(_main_gotNewgrfs, poller, info, details)
-
-def _main_gotNewgrfs ((host, port, newgrfs), poller, info, details) :
-    print newgrfs
-
     reactor.stop()
 
 if __name__ == '__main__' :
