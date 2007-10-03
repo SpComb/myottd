@@ -855,19 +855,34 @@ class Openttd (protocol.ProcessProtocol) :
         # from the filesystem
         newgrf_path = d['newgrf_path'] = "%s/data" % self.path
         newgrfs = d['newgrfs'] = []
+        
+        self.log("looking for .grfs in %s" % newgrf_path)
+        queue = list(os.walk(newgrf_path))
+        
+        for dirpath, dirnames, filenames in queue :
+            path_part = dirpath.split(newgrf_path)[1].lstrip('/')
+            
+            for dir in dirnames :
+                path = os.path.join(dirpath, dir)
 
-        for fname in os.listdir(newgrf_path) :
-            if fname in BUILTIN_NEWGRFS :
-                continue
+                if os.path.islink(path) :
+                    self.log("recursing into %s" % path)
+                    queue.extend(os.walk(path))
 
-            if fname in cfg_grfs :
-                params = cfg_grfs[fname]
-                loaded = True
-            else :
-                params = None
-                loaded = False
+            for fname in filenames :
+                fpath = os.path.join(path_part, fname)
 
-            newgrfs.append((fname, loaded, params))
+                if fpath in BUILTIN_NEWGRFS :
+                    continue
+
+                if fpath in cfg_grfs :
+                    params = cfg_grfs[fpath]
+                    loaded = True
+                else :
+                    params = None
+                    loaded = False
+
+                newgrfs.append((fpath, loaded, params))
 
         if self.running :
             return self.queryServerInfo().addCallback(self._serverOverviewGotInfo, d)
