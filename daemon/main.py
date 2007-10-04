@@ -566,12 +566,14 @@ class Openttd (protocol.ProcessProtocol) :
                 self._cmdOver()
             else :
                 self.reply_buffer.append(line)
+        elif line.startswith('dbg: [NET][UDP] Queried from') :
+            pass
         else :
             # handle events later, perhaps
             self.log("event: %s" % line)
     
     def writeLine (self, line) :
-        self.log("write: %s" % line)
+        #self.log("write: %s" % line)
         
         self.transport.write(line + '\n')
 
@@ -584,7 +586,7 @@ class Openttd (protocol.ProcessProtocol) :
             raise Exception("not running")
 
         # escape the arguments as needed
-        args2 = []
+        args2 = ['']
         for arg in args :
             if isinstance(arg, basestring) :
                 args2.append('"%s"' % arg)
@@ -592,7 +594,7 @@ class Openttd (protocol.ProcessProtocol) :
                 args2.append(str(arg))
         
         # compose the command string
-        cmd_str = self.cmd_str = '%s %s' % (cmd, ' '.join(args2))
+        cmd_str = self.cmd_str = '%s%s' % (cmd, ' '.join(args2))
         
         # compose the delimiter
         cmd_count = self.cmd_count
@@ -622,7 +624,7 @@ class Openttd (protocol.ProcessProtocol) :
 
         self.cmd_deferred = self.reply_buffer = None
 
-        self.log("Got response to command `%s`:\n    %s" % (self.cmd_str, '\n    '.join(buf)))
+        #self.log("Got response to command `%s`:\n    %s" % (self.cmd_str, '\n    '.join(buf)))
 
         d.callback(buf)
  
@@ -762,7 +764,7 @@ class Openttd (protocol.ProcessProtocol) :
                 d, m, y = date.split('-')
                 return "%04d%02d%02d" % (int(y), int(m), int(d))
 
-        return None
+        raise Exception("Unable to find date: %s" % (lines, ))
     
     # players command
     def getPlayers (self) :
@@ -932,9 +934,11 @@ class Openttd (protocol.ProcessProtocol) :
             self.log("save dir %s does not exist, creating" % savedir_path)
             os.mkdir(savedir_path)
 
-        return self.cmdGetdate().addCallback(self._doSaveGame_gotDate, game_id)
+        return poller.getInfo("127.0.0.1", self.port).addCallback(self._doSaveGame_gotDate, game_id)
 
-    def _doSaveGame_gotDate (self, date, game_id) :
+    def _doSaveGame_gotDate (self, (host, port, info), game_id) :
+        date = info.ext_date.current.strftime("%Y%m%d")
+
         new_save_path = "game_%d/save_%s" % (game_id, date)
         
         self.log("saving game_id=%s, date=%s" % (game_id, date))
@@ -1139,17 +1143,23 @@ class Openttd (protocol.ProcessProtocol) :
     #
     # New UDP-based status stuff
     #
-    def rpcGetInfo (self, includeNewGrfs=False) :
+    def rpcGetInfo (self, includeNewGrfs=False, _attempts=0) :
         """
             Return a dict with the info needed for showing this server in a list of servers
         """
+
+        if _attempts > 3 :
+            raise Exception("No response from server")
         
         if self.running :
-            return poller.getInfo("127.0.0.1", self.port).addCallback(self._rpcGetInfo_result, includeNewGrfs)
+            return poller.getInfo("127.0.0.1", self.port).addCallback(self._rpcGetInfo_result, includeNewGrfs, _attempts)
         else :
             return defer.suceed(None)
 
-    def _rpcGetInfo_result (self, (host, port, info), includeNewGrfs) :
+    def _rpcGetInfo_result (self, (host, port, info), includeNewGrfs, _attempts) :
+        if info is None :
+            return self.rpcGetInfo(includeNewGrfs, _attempts + 1)
+
         ret = dict(
             port            = port,
             server_name     = info.basic.name,
@@ -1257,8 +1267,11 @@ class Openttd (protocol.ProcessProtocol) :
         """
             Return what getDetails returns, but with some more internal info for use in the admin pages
         """
-
-        return self.rpcGetDetails().addCallback(self._rpcGetAdmin_gotDetails)
+        
+        if self.running :
+            return self.rpcGetDetails().addCallback(self._rpcGetAdmin_gotDetails)
+        else :
+            return defer.succeed(None)
     
     def _rpcGetAdmin_gotDetails (self, info) :
         info.update(dict(

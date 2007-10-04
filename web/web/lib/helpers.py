@@ -27,6 +27,7 @@ from pylons import c
 
 import web.models
 from datetime import datetime, date
+import math
 
 climate_opts = web.models.climateNamesToCode
 
@@ -40,7 +41,10 @@ def fmtTimestamp (ts) :
     return datetime.fromtimestamp(ts).strftime("%Y/%m/%d %H:%M")
 
 def fmtDatestamp (ds) :
-    return date(year=int(ds[0:4]), month=int(ds[4:6]), day=int(ds[6:8])).strftime("%b %d %Y")
+    if ds :
+        return date(year=int(ds[0:4]), month=int(ds[4:6]), day=int(ds[6:8])).strftime("%b %d %Y")
+    else :
+        return "Auto"
 
 def fmtDateDict (dd) :
     return date(year=dd['year'], month=dd['month'], day=dd['day']).strftime("%b %d %Y")
@@ -72,4 +76,7 @@ def fmtMoney (money) :
         html = '<span class="negative">%s</span>' % html
 
     return html
+
+def mapSize2value (size) :
+    return int(math.log(size, 2))
 

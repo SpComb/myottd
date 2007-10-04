@@ -377,4 +377,3 @@ if __name__ == '__main__' :
     else :
         print "specify the name of the new OpenTTD version as a command-line argument"
 
-cat license-header openttd/*.py

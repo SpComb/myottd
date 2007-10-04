@@ -10,6 +10,8 @@
     }
 </script>
 
+% s = c.server_info
+% if s :
 <fieldset>
     <legend>Server options</legend>
 
@@ -26,9 +28,9 @@
         <select name="version">
             <% h.options_for_select(c.available_versions, c.server_info['version_id']) %>
         </select>
-% if c.server_info['version_name'] != c.server_info['version'] :
+%   if c.server_info['version_name'] != c.server_info['version'] :
             <span class="current">You must restart for this to take effect</span>
-% # end if
+%   # end if
         <br/>
 
         <label for="password">Password</label>
@@ -47,22 +49,19 @@
 
     <a href="<% h.url_for('admin_server_config', id=c.id) %>">Game Configuration</a>
 </fieldset>
+% # end if
 
 <fieldset>
     <legend>Controls</legend>
 
     <form action="<% h.url_for('admin_server_edit', id=c.server_id) %>" method="POST">
-        <label for="status">Status</label>
-        <span id="status"><% c.server_status %></span>
-        <br />
-
-% if c.server_status == 'online' :
+% if c.server_info :
         <input type="submit" name="action" value="Stop" />
         <br />
 
         <input type="submit" name="action" value="Restart" />
         <br/>
-% elif c.server_status == 'offline' :
+% else :
         <input type="submit" name="action" value="Start" />
         <br/>
 % # end if
@@ -70,6 +69,7 @@
     </form>
 </fieldset>
 
+% if s :
 <fieldset>
     <legend>Start new random game</legend>
 
@@ -80,12 +80,12 @@
         </select>
         <br/>
 
-% map_geom_opts = [(2**x, x) for x in xrange(6, 11)]
+%   map_geom_opts = [(2**x, x) for x in xrange(6, 11)]
         <label for="patches.map_x patches.map_y">Map Size</label>
         <select name="patches.map_x" class="thin">
-            <% h.options_for_select(map_geom_opts, c.server_info['map_width']) %>
+            <% h.options_for_select(map_geom_opts, h.mapSize2value(c.server_info['map_width'])) %>
         </select> x <select name="patches.map_y" class="thin">
-            <% h.options_for_select(map_geom_opts, c.server_info['map_height']) %>
+            <% h.options_for_select(map_geom_opts, h.mapSize2value(c.server_info['map_height'])) %>
         </select>
         <br/>
 
@@ -94,8 +94,6 @@
     </form>
 </fieldset>
 
-% s = c.server_info
-% if s :
 %   cur_game_id = str(s['game_id'])
 %   cur_save_ds = s['save_date']
 <fieldset>
