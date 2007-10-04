@@ -150,9 +150,10 @@ class Openttd (protocol.ProcessProtocol) :
         self.path = '%s/servers/%d' % (BASE_PATH, self.id)
 
         self._setStuff(*stuff)
-#        self._setGameStuff()
+        
+        self._var_cache = {}
 
-    def _setStuff (self, username, server_name, port, advertise, password, version, owner_uid, url) :
+    def _setStuff (self, username, server_name, port, advertise, password, version, owner_uid, url, version_id) :
         self.username = username
         self._server_name = server_name
         self.url = url
@@ -162,19 +163,14 @@ class Openttd (protocol.ProcessProtocol) :
         self.password = password
         self.version = version
         self.owner_uid = owner_uid
-    
-#    def _setGameStuff (self, climate='normal', map_x=8, map_y=8) :
-#        if climate in ('normal', 'desert', 'hilly', 'candy') :
-#            self.game_climate = climate
-#        else :
-#            raise ValueError(climate)
-#
-#        if 6 <= map_x <= 11 and 6 <= map_y <= 11 :
-#            self.map_x = map_x
-#            self.map_y = map_y
-#        else :
-#            raise ValueError((map_x, map_y))
-#
+
+        # new naming convention
+        self.owner_part     = username
+        self.tag_part       = url
+        self.name_part      = server_name
+        self.version_id     = version_id
+        self.version_name   = version
+
     def log (self, msg) :
         print '%d: %s' % (self.id, msg)
 
@@ -196,7 +192,7 @@ class Openttd (protocol.ProcessProtocol) :
                 self.log("found game_id.txt")
                 fh = open(game_id_path, 'r')
                 self.game_id = int(fh.read())
-                self.save_date = "auto"
+                self.save_date = None
             else :
                 self.game_id = False
 
@@ -842,52 +838,6 @@ class Openttd (protocol.ProcessProtocol) :
             custom_save_path="%s/save/custom.sav" % self.path,
         )
         
-        # stuff from the config file
-        config = ConfigParser.RawConfigParser()
-        config.read(['%s/openttd.cfg' % self.path])
-        
-        # misc
-        d['climate'] = config.get('gameopt', 'landscape')
-        d['map_x'] = config.getint('patches', 'map_x')
-        d['map_y'] = config.getint('patches', 'map_y')
-
-        # newgrf info
-        cfg_grfs = {}
-        for name, params in config.items('newgrf') :
-            cfg_grfs[name] = params
-        
-        # from the filesystem
-        newgrf_path = d['newgrf_path'] = "%s/data" % self.path
-        newgrfs = d['newgrfs'] = []
-        
-        self.log("looking for .grfs in %s" % newgrf_path)
-        queue = list(os.walk(newgrf_path))
-        
-        for dirpath, dirnames, filenames in queue :
-            path_part = dirpath.split(newgrf_path)[1].lstrip('/')
-            
-            for dir in dirnames :
-                path = os.path.join(dirpath, dir)
-
-                if os.path.islink(path) :
-                    self.log("recursing into %s" % path)
-                    queue.extend(os.walk(path))
-
-            for fname in filenames :
-                fpath = os.path.join(path_part, fname)
-
-                if fpath in BUILTIN_NEWGRFS :
-                    continue
-
-                if fpath in cfg_grfs :
-                    params = cfg_grfs[fpath]
-                    loaded = True
-                else :
-                    params = None
-                    loaded = False
-
-                newgrfs.append((fpath, loaded, params))
-
         if self.running :
             return self.queryServerInfo().addCallback(self._serverOverviewGotInfo, d)
         else :
@@ -906,21 +856,6 @@ class Openttd (protocol.ProcessProtocol) :
         # savegames
         d['games'] = {}
 
-        for dirpath, dirnames, filenames in os.walk("%s/save" % self.path) :
-            head, tail = os.path.split(dirpath.rstrip('/'))
-
-            g_id = game_id(tail)
-
-            if g_id :
-                g = d['games'][g_id] = []
-                
-                for fname in filenames :
-                    s_date = save_date(fname)
-
-                    if s_date :
-                        g.append(s_date)
-
-                g.sort()
 
         if self.running :
             return self.cmdGetdate().addCallback(self._serverDetails_gotDate, d)
@@ -1078,29 +1013,146 @@ class Openttd (protocol.ProcessProtocol) :
         self.custom_save = name
 
         return None
+    
+    #
+    # console commands
+    #
+    def getVar (self, name, cache=True) :
+        if cache and name in self._var_cache :
+            return defer.succeed(self._var_cache[name])
+        else :
+            return self.command(name).addCallback(self._getVar_result, name, cache)
+
+    def _getVar_result (self, lines, name, cache) :
+        for line in lines :
+            if line.startswith("Current value for '%s' is:") :
+                _, value = line.split(':', 1)
+                value = value.strip()
+                
+                if cache :
+                    self._var_cache[name] = value
+                
+                return value
+            elif line.startswith("ERROR") :
+                raise Exception(line)
+
+        return None
+
+    def setVar (self, name, value) :
+        if isinstance(value, basestring) :
+            value = str(value).strip()
+
+        return self.command(name, value).addCallback(self._setVar_result, name, value)
+
+    def _setVar_result (self, lines, name, value) :
+        for line in lines :
+            if line.startswith("'%s' changed to:" % name) :
+                _, value = line.split(':',  1)
+
+                value = value.strip()
+
+                self._var_cache[name] = value
+
+                return value
+            elif line.startswith("ERROR") :
+                raise Exception(line)
+
+        return None
+
+    #
+    # Utility functions to handle internal info for the below functions
+    #
+    def setServerName (self, tag, name) :
+        self.tag_part = tag
+        self.name_part = name
+
+        if tag :
+            tag = "/%s" % tag
+
+        server_name = "%s.myottd.net%s - %s" % (self.owner_part, tag, self.name_part)
+
+        return self.setVar('server_name', server_name)
+
+    def getSavegameInfo (self) :         
+        games = {}
+
+        for dirpath, dirnames, filenames in os.walk("%s/save" % self.path) :
+            head, tail = os.path.split(dirpath.rstrip('/'))
+
+            g_id = game_id(tail)
+
+            if g_id :
+                g = games[g_id] = []
+                
+                for fname in filenames :
+                    s_date = save_date(fname)
+
+                    if s_date :
+                        g.append(s_date)
+
+                g.sort()
+
+        return games
+
+    def getNewgrfConfig (self) :
+        newgrf_path = "%s/data" % self.path
+        newgrfs = []
+        config = ConfigParser.RawConfigParser()
+        config.read(['%s/openttd.cfg' % self.path])
         
+        # newgrf info from the config file
+        cfg_grfs = {}
+        for name, params in config.items('newgrf') :
+            cfg_grfs[name] = params
+        
+        # from the filesystem
+        self.log("looking for .grfs in %s" % newgrf_path)
+        queue = list(os.walk(newgrf_path))
+        
+        for dirpath, dirnames, filenames in queue :
+            path_part = dirpath.split(newgrf_path)[1].lstrip('/')
+            
+            for dir in dirnames :
+                path = os.path.join(dirpath, dir)
+
+                if os.path.islink(path) :
+                    self.log("recursing into %s" % path)
+                    queue.extend(os.walk(path))
+
+            for fname in filenames :
+                fpath = os.path.join(path_part, fname)
+
+                if fpath in BUILTIN_NEWGRFS :
+                    continue
+
+                if fpath in cfg_grfs :
+                    params = cfg_grfs[fpath]
+                    loaded = True
+                else :
+                    params = None
+                    loaded = False
+
+                newgrfs.append((fpath, loaded, params))
+
+        return newgrf_path, newgrfs
+
     #
     # New UDP-based status stuff
     #
-    def rpcGetInfo (self) :
+    def rpcGetInfo (self, includeNewGrfs=False) :
         """
             Return a dict with the info needed for showing this server in a list of servers
         """
         
         if self.running :
-            return poller.getInfo("127.0.0.1", self.port).addCallback(self._rpcGetInfo_result)
+            return poller.getInfo("127.0.0.1", self.port).addCallback(self._rpcGetInfo_result, includeNewGrfs)
         else :
             return defer.suceed(None)
 
-    def _rpcGetInfo_result (self, (host, port, info)) :
-        return dict(
-            id              = self.id,
-            owner_id        = self.owner_uid,
-            owner           = self.username,
-            tag             = self.url,
-            server_name     = info.basic.name,
-            _server_name    = self._server_name,
+    def _rpcGetInfo_result (self, (host, port, info), includeNewGrfs) :
+        ret = dict(
             port            = port,
+            server_name     = info.basic.name,
             client_count    = info.basic.clients_current,
             client_max      = info.basic.clients_max,
             company_count   = info.ext_limits.companies_current,
@@ -1114,7 +1166,21 @@ class Openttd (protocol.ProcessProtocol) :
             spectator_count = info.basic.spectators_current,
             spectator_max   = info.ext_limits.spectators_max,
             password        = bool(info.basic.password),
+
+            # internal pieces of data
+            id              = self.id,
+            owner_id        = self.owner_uid,
+            owner           = self.owner_part,
+            tag_part        = self.tag_part,
+            name_part       = self.name_part,
+            version_id      = self.version_id,
+            version_name    = self.version_name,
         )
+
+        if includeNewGrfs :
+            return ret, info.newgrf_info.newgrfs
+        else :
+            return ret
 
     def rpcGetDetails (self) :
         """
@@ -1122,14 +1188,14 @@ class Openttd (protocol.ProcessProtocol) :
         """
 
         if self.running :
-            return self.rpcGetInfo().addCallback(self._rpcGetDetails_gotInfo)
+            return self.rpcGetInfo(True).addCallback(self._rpcGetDetails_gotInfo)
         else :
             return defer.succeed(None)
 
-    def _rpcGetDetails_gotInfo (self, info) :
-        return poller.getDetails("127.0.0.1", self.port).addCallback(self._rpcGetDetails_result, info)
+    def _rpcGetDetails_gotInfo (self, (info, newgrfs)) :
+        return poller.getDetails("127.0.0.1", self.port).addCallback(self._rpcGetDetails_gotDetails, info, newgrfs)
 
-    def _rpcGetDetails_result (self, (host, port, details), info) :
+    def _rpcGetDetails_gotDetails (self, (host, port, details), info, newgrfs) :
         info.update(dict(
             companies=[dict(
                 id                  = c.id,
@@ -1159,14 +1225,86 @@ class Openttd (protocol.ProcessProtocol) :
                 name                = s.name,
                 joined              = s.joined,
             ) for s in details.spectators],
+            
+            # some internal info, not from UDP
+            random_map      = self.random_map,
+            game_id         = self.game_id,
+            save_date       = self.save_date,
+            custom_save     = self.custom_save,
+        ))
+        
+        if newgrfs :
+            return poller.getNewGrfs("127.0.0.1", self.port, newgrfs).addCallback(self._rpcGetDetails_gotNewGrfs, info)
+        else :
+            info.update(dict(
+                newgrfs             = [],
+            ))
+
+            return info
+
+    def _rpcGetDetails_gotNewGrfs (self, (host, port, newgrfs), info) :
+        info.update(dict(
+            newgrfs=[dict(
+                grfid               = g.grfid,
+                md5                 = g.md5,
+                name                = g.name,
+            ) for g in newgrfs.newgrfs],
         ))
 
         return info
 
+    def rpcGetAdminInfo (self) :
+        """
+            Return what getDetails returns, but with some more internal info for use in the admin pages
+        """
+
+        return self.rpcGetDetails().addCallback(self._rpcGetAdmin_gotDetails)
+    
+    def _rpcGetAdmin_gotDetails (self, info) :
+        info.update(dict(
+            games                   = self.getSavegameInfo(),
+        ))
+
+        info['newgrf_path'], info['newgrf_config'] = self.getNewgrfConfig()
+
+        return self.getVar('server_pw').addCallback(self._rpcGetAdmin_gotVars, info)
+    
+    def _rpcGetAdmin_gotVars (self, server_pw, info) :
+        info.update(dict(
+            password_value      = server_pw,
+        ))
+
+        return info
+
+    def rpcApply (self, tag_part, name_part, version_id, password) :
+        """
+            Update the game with the given params. Changing the version will require an explicit restart
+        """
+        
+        if version_id != self.version_id :
+            self.version_id = version_id
+            return db.query("SELECT version FROM openttd_versions WHERE id=%s", version_id).addCallback(self._rpcApply_gotVersionName, tag_part, name_part, password)
+        else :
+            return self._rpcApply_doServerName(tag_part, name_part, password)
+
+    def _rpcApply_gotVersionName (self, res, tag_part, name_part, password) :
+        self.version_name = res[0][0]
+
+        return self._rpcApply_doServerName(tag_part, name_part, password)
+
+    def _rpcApply_doServerName (self, tag_part, name_part, password) :
+        return self.setServerName(tag_part, name_part).addCallback(self._rpcApply_setName, password)
+      
+    def _rpcApply_setName (self, res, password) :
+        if not password :
+            password = "*"
+
+        return self.setVar('server_pw', password)
+
 def failure (failure) :
     print 'FAILURE: %s' % failure
 
-COLS = "u.username, s.name, s.port, s.advertise, s.password, o_v.version, u.id, s.url"
+COLS = "u.username, s.name, s.port, s.advertise, s.password, o_v.version, u.id, s.url, o_v.id"
 SERVER_QUERY_BASE = "SELECT s.id, %s FROM servers s INNER JOIN users u ON s.owner = u.id INNER JOIN openttd_versions o_v ON s.version = o_v.id WHERE s.enabled" % COLS
 
 class ServerManager (object) :

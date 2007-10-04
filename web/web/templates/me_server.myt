@@ -14,57 +14,38 @@
     <legend>Server options</legend>
 
     <form action="<% h.url_for('admin_server_edit', id=c.server_id) %>" method="POST">
-        <label for="url">Tag</label>
-        <input type="text" name="url" value="<% c.server_url | h %>" onchange="changed()" />
-% if c.server_config_stale and c.server_info :
-            <span class="current">"<% c.server_info['server_url'] | h %>"</span>
-% # end if
+        <label for="tag">Tag</label>
+        <input type="text" name="tag" value="<% c.server_info['tag_part'] | h %>" onchange="changed()" />
         <br />
 
-        <label for="name">Title</label>
-        <input type="text" name="name" value="<% c.server_name | h %>" onchange="changed()" />
-% if c.server_config_stale and c.server_info :
-            <span class="current">"<% c.server_info['server_name'] | h %>"</span>
-% # end if
+        <label for="name">Name</label>
+        <input type="text" name="name" value="<% c.server_info['name_part'] | h %>" onchange="changed()" />
         <br />
 
         <label for="version">Version</label>
         <select name="version">
-            <% h.options_for_select(c.available_versions, c.server_version_id) %>
+            <% h.options_for_select(c.available_versions, c.server_info['version_id']) %>
         </select>
-% if c.server_config_stale and c.server_info :
-            <span class="current">"<% c.server_info['version'] %>"</span>
+% if c.server_info['version_name'] != c.server_info['version'] :
+            <span class="current">You must restart for this to take effect</span>
 % # end if
         <br/>
-
-<!--
-        <label for="advertise">Advertise</label>
-        <input type="checkbox" name="advertise" value="1" class="checkbox" \
-% if c.server_advertise :
-checked="checked" \
-% # end if
-/>
-        <br/>
--->
 
         <label for="password">Password</label>
-        <input type="text" name="password" value="<% c.server_password | h %>" />
-% if c.server_config_stale and c.server_info :
-            <span class="current">"<% c.server_info['password'] | h %>"</span>
-% # end if
+        <input type="text" name="password" value="<% c.server_info['password_value'] | h %>" />
+        <span class="hint">No whitespace at the beginning/end</span>
         <br/>
+        
+        <p class="form_hint">Server name preview: <strong id="output_name"><% c.view_user.username %>.myottd.net<% c.server_info['tag_part'] and "/%s" % c.server_info['tag_part'] or '' %> - <% c.server_info['name_part'] %></strong></p>
 
         <input type="submit" name="action" value="Apply" />
         <br />
 
-% if c.server_config_stale :
-        <strong>You must restart your server for the changes to take effect</strong>
-% # end if
     </form>
     
-    <p class="form_hint">Server name preview: <strong id="output_name"><% c.view_user.username %>.myottd.net<% c.server_url and "/%s" % c.server_url or '' %> - <% c.server_name %></strong></p>
+    <hr/>
 
-    <a href="<% h.url_for('admin_server_config', id=c.id) %>">Edit game configuration</a>
+    <a href="<% h.url_for('admin_server_config', id=c.id) %>">Game Configuration</a>
 </fieldset>
 
 <fieldset>
@@ -95,16 +76,16 @@ checked="checked" \
     <form action="<% h.url_for('admin_server_newrandom', id=c.server_id) %>" method="POST">
         <label for="gameopt.landscape">Climate</label>
         <select name="gameopt.landscape">
-            <% h.options_for_select(h.climate_opts, c.server_info.get('climate', None)) %>
+            <% h.options_for_select(h.climate_opts, c.server_info['map_type']) %>
         </select>
         <br/>
 
 % map_geom_opts = [(2**x, x) for x in xrange(6, 11)]
         <label for="patches.map_x patches.map_y">Map Size</label>
         <select name="patches.map_x" class="thin">
-            <% h.options_for_select(map_geom_opts, c.server_info.get('map_x', None)) %>
+            <% h.options_for_select(map_geom_opts, c.server_info['map_width']) %>
         </select> x <select name="patches.map_y" class="thin">
-            <% h.options_for_select(map_geom_opts, c.server_info.get('map_y', None)) %>
+            <% h.options_for_select(map_geom_opts, c.server_info['map_height']) %>
         </select>
         <br/>
 
@@ -179,14 +160,14 @@ checked="checked" \
     <legend>NewGRFs</legend>
     
     <form action="<% h.url_for('admin_server_newgrfs', id=c.id) %>" method="POST" enctype="multipart/form-data">
-%   if s['newgrfs'] :
+%   if s['newgrf_config'] :
     <table class="newgrfs">
         <tr>
             <th>Enabled</th>
             <th>NewGRF name</th>
             <th>Params</th>
         </tr>
-%       for filename, loaded, params in s['newgrfs'] :
+%       for filename, loaded, params in s['newgrf_config'] :
         <tr>
             <input type="hidden" name="newgrfs[]" value="<% filename %>" />
             <td><input type="checkbox" name="<% filename %>_enabled" <% loaded and 'checked="checked" ' or '' %>value="1" class="checkbox" /></td>

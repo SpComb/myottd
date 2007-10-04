@@ -27,7 +27,7 @@ import main
 class DateEncoder (simplejson.JSONEncoder) :
     def default (self, obj) :
         if isinstance(obj, datetime.date) :
-            return obj.strftime('%Y-%m-%d')
+            return obj.strftime('%Y%m%d')
         else :
             return simplejson.JSONEncoder.default(self, obj)
 
@@ -127,6 +127,20 @@ class ServerInfoQuery (RpcResource) :
     def _gotDetails (self, res, request) :
         reply(request, 'server_info', res)
 
+class AdminInfoQuery (RpcResource) :
+    def render_RPC (self, request, id) :
+        self.main.servers[int(id)].rpcGetAdminInfo().addCallback(self._gotDetails, request).addErrback(self.failure, request)
+
+    def _gotDetails (self, res, request) :
+        reply(request, 'admin_info', res)
+
+class ApplyQuery (RpcResource) :
+    def render_RPC (self, r, id, **opts) :
+        self.main.servers[int(id)].rpcApply(**opts).addCallback(self._done, r).addErrback(self.failure, r)
+
+    def _done (self, res, r) :
+        reply(r, 'save_game', res)
+
 class SaveGameQuery (RpcResource) :
     def render_RPC (self, r, id) :
         self.main.servers[int(id)].saveGame().addCallback(self._done, r).addErrback(self.failure, r)
@@ -182,9 +196,10 @@ class Site (server.Site) :
         root.putChild('start', StartQuery(main))
         root.putChild('stop', StopQuery(main))
         root.putChild('restart', RestartQuery(main))
-        root.putChild('debug', DebugQuery(main))
         root.putChild('servers', ServersQuery(main))
         root.putChild('server_info', ServerInfoQuery(main))
+        root.putChild('admin_info', AdminInfoQuery(main))
+        root.putChild('apply', ApplyQuery(main))
         root.putChild('save_game', SaveGameQuery(main))
         root.putChild('load_game', LoadGameQuery(main))
         root.putChild('config', ConfigQuery(main))

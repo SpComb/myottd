@@ -40,7 +40,7 @@ def fmtTimestamp (ts) :
     return datetime.fromtimestamp(ts).strftime("%Y/%m/%d %H:%M")
 
 def fmtDatestamp (ds) :
-    return date(*[int(p) for p in ds.split('-')]).strftime("%b %d %Y")
+    return date(year=int(ds[0:4]), month=int(ds[4:6]), day=int(ds[6:8])).strftime("%b %d %Y")
 
 def fmtDateDict (dd) :
     return date(year=dd['year'], month=dd['month'], day=dd['day']).strftime("%b %d %Y")
@@ -66,5 +66,10 @@ def res_url (url) :
     return url_for('home') + url
 
 def fmtMoney (money) :
-    return number_to_currency(money, unit='&euro; ', precision=0, separator='.', delimiter=',')
+    html = number_to_currency(money, unit='&euro; ', precision=0, separator='.', delimiter=',')
+
+    if money < 0 :
+        html = '<span class="negative">%s</span>' % html
+
+    return html
 

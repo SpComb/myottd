@@ -40,11 +40,11 @@
     <tr class="<% i % 2 and 'even' or 'odd' %>">
 %   if not c.view_user and show_username :
             <td rowspan="<% player_servers[uid] %>">
-                <a href="<% h.url_for('user', sub_domain=s['owner']) %>"><% s['owner'] %></a>
+                <a href="<% h.url_for('user', sub_domain=s['owner']) | h %>"><% s['owner'] | h %></a>
             </td>
 %   # end if        
         <td>
-            <a href="<% h.url_for('server', sub_domain=s['owner'], url=s['tag']) %>"><% s['tag'] and "%s - " % s['tag'] or '' %><% s['_server_name'] %></a>
+            <a href="<% h.url_for('server', sub_domain=s['owner'], url=s['tag_part']) | h %>"><% s['tag_part'] and "%s - " % s['tag_part'] or '' | h %><% s['name_part'] | h %></a>
         </td>
         <td>
             <% s['client_count'] %> / <% s['client_max'] %>

@@ -1,4 +1,4 @@
-<h1>OpenTTD Configuration</h1>
+<h1>Game Configuration</h1>
 
 <form action="<% h.url_for('admin_server_config', id=c.id) %>" method="POST">
 

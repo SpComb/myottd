@@ -144,8 +144,8 @@ DetailInfo = c.Struct("detailinfo",
         c.CString("name"),
         c.ULInt32("inaugurated"),
         c.ULInt64("company_value"),
-        c.ULInt64("balance"),
-        c.ULInt64("income"),
+        c.SLInt64("balance"),
+        c.SLInt64("income"),
         c.ULInt16("performance"),
         c.ULInt8("password"),
         c.Struct("vehicles",
@@ -215,7 +215,7 @@ class Poller (protocol.DatagramProtocol) :
         self.log("%d bytes from %s:%s", len(data), host, port)
 
         if (host, port) in self.requests :
-            type, d = self.requests[(host, port)]
+            type, d = self.requests.pop((host, port))
 
             self.log("is a reply to a %s query" % type)
 

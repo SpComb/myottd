@@ -37,7 +37,7 @@ class MeController (BaseController) :
     @require_login
     @form_handler
     def server_add (self) :
-        s = model.server_create(c.user.id, request.params['url'], request.params['name'], int(request.params.get('version')))
+        s = model.server_create(c.view_user.id, request.params['url'], request.params['name'], int(request.params.get('version')))
         
         h.redirect_to('admin_server', id=s.id)
     
@@ -45,7 +45,7 @@ class MeController (BaseController) :
     def server (self, id) :
         c.server_id = id
         c.server_name, c.owner_name, c.server_port, c.server_status, c.server_version, c.server_version_id, c.server_config_stale, c.server_password, c.server_url = model.server_info(id)
-        c.server_info = rpc.server_info(id)
+        c.server_info = rpc.invoke('admin_info', id=id)
         c.available_versions = model.available_versions()
         
         return render_response('me_server.myt')
@@ -62,16 +62,20 @@ class MeController (BaseController) :
         elif action == 'Restart' :
             rpc.invoke('restart', id=id)
         elif action == 'Apply' :
-            server = model.Server.get_by(id=id)
-            
-            server.url = request.params['url']
-            server.name = request.params['name']
-            server.version = request.params['version']
-#           server.advertise = bool(request.params.get('advertise', 0))
-            server.password = request.params['password']
+            rpc.invoke('apply', 
+                id          = id,
+                tag_part    = request.params['tag'], 
+                name_part   = request.params['name'], 
+                version_id  = int(request.params['version']), 
+                password    = request.params['password']
+            )
 
-            server.touch()
-        
+            c.admin_server.url       = request.params['tag']
+            c.admin_server.name      = request.params['name']
+            c.admin_server.version   = request.params['version']
+
+            c.admin_server.flush()
+
         h.redirect_to('admin_server', id=id)
     
     @validate_id

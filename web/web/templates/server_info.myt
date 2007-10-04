@@ -24,16 +24,28 @@
         </td>
     </tr>
     <tr id="info_row">
-        <td class="left_align">
-            <img src="<% h.res_url("icons/landscape_normal.png") %>" />
+        <td>
+            <img src="<% h.res_url("icons/landscape_%s.png" % s['map_type']) %>" />
         </td>
         <td>
             <p>Map Size</p>
-            512x512
+            <% s['map_width'] %>x<% s['map_height'] %>
         </td>
         <td>
             <p>Map Type</p>
+%   if s['random_map'] :            
             Random Game
+%   elif s['game_id'] :
+%       if s['save_date'] :
+            Game <% s['game_id'] %> - Saved <% h.fmtDatestamp(s['save_date']) %>
+%       else :
+            Game <% s['game_id'] %> - Autosave
+%       # end if            
+%   elif s['custom_save'] :
+            Savegame <% s['custom_save'] | h %>
+%   else :
+            Autosave
+%   # end if
         </td>
         <td>
             <p>Game Start</p>
@@ -48,6 +60,7 @@
             <% s['spectator_count'] %> / <% s['spectator_max'] %>
         </td>
     </tr>
+%   if s['companies'] :    
     <tr>
         <td colspan="10">
             <table id="company_list" cellspacing="1">
@@ -66,12 +79,12 @@
                 </tr>
                 <tr>
                     <td colspan="7"></td>
-%  for veh_type in ('trains', 'trucks', 'busses', 'planes', 'ships')*2 :
+%       for veh_type in ('trains', 'trucks', 'busses', 'planes', 'ships')*2 :
                     <td><img src="<% h.res_url("icons/vehicle_%s.png" % veh_type) %>" /></td>
-%  # end for
+%       # end for
                     <td colspan="2"></td>
                 </tr>
-%  for i, c in enumerate(s['companies']) :
+%       for i, c in enumerate(s['companies']) :
                 <tr class="<% i % 2 and 'even' or 'odd' %>">
                     <td><% c['id'] %></td>
                     <td class="left_align"><% c['name'] | h %></td>
@@ -90,17 +103,38 @@
                     <td><% c['stn_busses'] %></td>
                     <td><% c['stn_planes'] %></td>
                     <td><% c['stn_ships'] %></td>
-                    <td><% " ".join([p['name'] for p in c['clients']]) %></td>
+                    <td><% " ".join([p['name'] for p in c['clients']]) | h %></td>
                     <td>
-%   if c['password'] :
-                        <img src="<% h.res_url("icons/locked.png") %>" />
-%   # end if                        
+%           if c['password'] :
+                        <img src="<% h.res_url("icons/lock.png") %>" />
+%           # end if                        
                     </td>
                 </tr>
-%  # end for
+%       # end for
             </table>
         </td>
     </tr>
+%   # end if    
+%   if s['newgrfs'] :
+    <tr>
+        <td colspan="10">
+            <table id="newgrf_list" cellspacing="1">
+                <tr>
+                    <th>GRF Name</th>
+                    <th>GRF ID</th>
+                    <th>MD5 Sum</th>
+                </tr>
+%       for i, g in enumerate(s['newgrfs']) :
+                <tr class="<% i % 2 and 'even' or 'odd' %>">
+                    <td class="left_align"><% g['name'] | h %></td>
+                    <td><a href="http://grfcrawler.tt-forums.net/index.php?do=search&q=<% g['grfid'] | u %>"><% g['grfid'] | h %></a></td>
+                    <td><% g['md5'] | h %></td>
+                </tr>
+%       # end for
+            </table>
+        </td>
+    </tr>
+%   # end if    
 </table>
 % else :
 <h1>Server offline</h1>
