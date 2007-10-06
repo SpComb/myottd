@@ -985,7 +985,7 @@ class Openttd (protocol.ProcessProtocol) :
         if self.running :
             return poller.getInfo("127.0.0.1", self.port).addCallback(self._rpcGetInfo_result, includeNewGrfs, _attempts)
         else :
-            return defer.suceed(None)
+            return defer.succeed(None)
 
     def _rpcGetInfo_result (self, (host, port, info), includeNewGrfs, _attempts) :
         if info is None :
