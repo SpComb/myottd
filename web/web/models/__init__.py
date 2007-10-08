@@ -121,8 +121,7 @@ def user_servers (user_id) :
             servers_table.c.url,
             servers_table.c.name, 
             servers_table.c.port, 
-            servers_table.c.advertise, 
-            servers_table.c.status,
+            servers_table.c.enabled,
             openttd_versions_table.c.version,
         ], 
         

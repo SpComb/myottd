@@ -125,7 +125,7 @@ class Server (protocol.ProcessProtocol) :
         I am an OpenTTD server of ours
     """
 
-    def __init__ (self, main, id, owner_id, owner_name, port, tag_part, name_part, version_id, version_name) :
+    def __init__ (self, main, id, owner_id, owner_name, port, tag_part, name_part, version_id, version_name, enabled) :
         # the ServerManager
         self.main = main
 
@@ -145,6 +145,9 @@ class Server (protocol.ProcessProtocol) :
 
         # set the server name
         self.server_name = self._fmtServerName(owner_name, tag_part, name_part)
+        
+        # are we supposed to be running?
+        self.enabled = enabled
 
         # a deferred that's set when launching and callbacked once it's running
         self.startup = None
@@ -188,9 +191,13 @@ class Server (protocol.ProcessProtocol) :
             Prepare the environment and start the openttd server
         """
 
+        if not self.enabled :
+            self.log("Not enabled")
+            return defer.succeed(None)
+
         assert not self.running and not self.startup
 
-        self.startup = defer.Deferred()
+        startup = self.startup = defer.Deferred()
         self.game_id = self.save_date = None
 
         autosave_path = "%s/save/auto.sav" % self.path
@@ -223,7 +230,7 @@ class Server (protocol.ProcessProtocol) :
         self.log("starting openttd... with args: ./%s" % " ".join(args))
         reactor.spawnProcess(self, '%s/openttd' % self.path, args=args, path=self.path, usePTY=True)
         
-        return self.startup
+        return startup
 
     def checkFilesystem (self) :
         """
@@ -243,7 +250,7 @@ class Server (protocol.ProcessProtocol) :
         cur_version = cur_version_path.split('/')[-1]
 
         if version_path != cur_version_path :
-            self.log("different openttd version, going from %s -> %s (%s -> %s)" % (cur_version, self.version, cur_version_path, version_path))
+            self.log("different openttd version, going from %s -> %s (%s -> %s)" % (cur_version, self.version_name, cur_version_path, version_path))
             os.unlink(ver_symlink_path)
             os.symlink(version_path, ver_symlink_path)
         else :
@@ -546,7 +553,7 @@ class Server (protocol.ProcessProtocol) :
         startup = self.startup
         self.startup = None
 
-        db.execute("UPDATE servers SET status='online', config_applied=NOW() WHERE id=%s", self.id).chainDeferred(startup)
+        startup.callback(None)
 
     def outReceived (self, data) :
         """
@@ -583,8 +590,6 @@ class Server (protocol.ProcessProtocol) :
 
         self.running = False
         self.log("ended: %s" % reason)
-
-        db.execute("UPDATE servers SET status='offline' WHERE id=%s", self.id)
 
         if self.cmd_deferred :
             self._cmdOver()
@@ -1187,7 +1192,7 @@ def failure (failure) :
     print 'FAILURE: %s' % failure
 
 
-COLS = "u.id, u.username, s.port, s.url, s.name, o_v.id, o_v.version"
+COLS = "u.id, u.username, s.port, s.url, s.name, o_v.id, o_v.version, s.enabled"
 SERVER_QUERY_BASE = "SELECT s.id, %s FROM servers s INNER JOIN users u ON s.owner = u.id INNER JOIN openttd_versions o_v ON s.version = o_v.id" % COLS
 
 class ServerManager (object) :

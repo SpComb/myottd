@@ -37,7 +37,19 @@ class MeController (BaseController) :
     @require_login
     @form_handler
     def server_add (self) :
-        s = model.server_create(c.view_user.id, request.params['url'], request.params['name'], int(request.params.get('version')))
+        s = model.server_create(c.view_user.id, request.params['tag'], request.params['name'], int(request.params.get('version')))
+
+        rpc.invoke('init',
+            id              = s.id,
+            owner_id        = c.view_user.id,
+            owner_name      = c.view_user.username,
+            port            = s.port,
+            tag_part        = s.url,
+            name_part       = s.name,
+            version_id      = s.version,
+            version_name    = model.Version.get_by(id=s.version).version,
+            enabled         = True,
+        )
         
         h.redirect_to('admin_server', id=s.id)
     
@@ -54,13 +66,20 @@ class MeController (BaseController) :
     @form_handler
     def server_edit (self, id) :
         action = request.params['action']
+        
+        enabled = None
 
         if action == 'Stop' :
-           rpc.invoke('stop', id=id)
+            rpc.invoke('stop', id=id)
+            enabled = False
+
         elif action == 'Start' :
             rpc.invoke('start', id=id)
+            enabled = True
+
         elif action == 'Restart' :
             rpc.invoke('restart', id=id)
+
         elif action == 'Apply' :
             rpc.invoke('apply', 
                 id          = id,
@@ -74,6 +93,10 @@ class MeController (BaseController) :
             c.admin_server.name      = request.params['name']
             c.admin_server.version   = request.params['version']
 
+            c.admin_server.flush()
+        
+        if enabled is not None :
+            c.admin_server.enabled = enabled
             c.admin_server.flush()
 
         h.redirect_to('admin_server', id=id)

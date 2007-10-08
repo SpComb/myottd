@@ -9,12 +9,11 @@
         <th>Status</th>
         <th>Version</th>
     </tr>
-%   for id, url, name, port, advertise, status, version in c.user_servers :
+%   for id, url, name, port, enabled, version in c.user_servers :
     <tr>
         <td><a href="<% h.url_for('admin_server', id=id, sub_domain=c.sub_domain) %>"><% h.serverName(c.view_user.username, url, name) %></a></td>
         <td><% port %></td>
-        <td><% advertise %></td>
-        <td><% status.title() %></td>
+        <td><% enabled and 'Enabled' or 'Disabled' %></td>
         <td><% version %></td>
     </tr>
 %   # end for
@@ -27,7 +26,7 @@
     function changed () {
         var f = document.forms[0]
 
-        var s = "<% c.view_user.username %>.myottd.net" + (f.url.value ? ("/" + f.url.value) : "") + " - " + f.name.value;
+        var s = "<% c.view_user.username %>.myottd.net" + (f.tag.value ? ("/" + f.tag.value) : "") + " - " + f.name.value;
 
         var d = document.getElementById("output_name");
 
@@ -39,8 +38,8 @@
     <legend>Create Server</legend>
 
     <form action="<% h.url_for('admin_server_add') %>" method="POST">
-        <label for="url">Tag</label>
-        <input type="text" name="url" onchange="changed()" />
+        <label for="tag">Tag</label>
+        <input type="text" name="tag" onchange="changed()" />
         <span class="hint">letters, numbers, some punctuation only, may be blank</span>
         <br/>
 

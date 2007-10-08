@@ -83,6 +83,8 @@ class RpcResource (resource.Resource) :
             This is the method that you implement
         """
 
+        print "RPC: %s: %s" % (self.name, kwargs)
+
         self.act(**kwargs).addCallback(self.result, req).addErrback(self.failure, req)
         
     def result (self, res, request) :
