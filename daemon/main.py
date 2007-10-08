@@ -36,11 +36,6 @@ SIGTERM = 15
 CONFIG_SETTINGS = (
     ('server_name', 'network',   'server_name',        'str'    ),
     ('port',        'network',   'server_port',        'int'    ),
-    ('advertise',   'network',   'server_advertise',   'bool'   ),
-    ('password',    'network',   'server_password',    'str'    ),
-#    ('game_climate','gameopt',   'landscape',          'str'    ),
-#    ('map_x',       'patches',   'map_x',              'int'    ),
-#    ('map_y',       'patches',   'map_y',              'int'    ),
 )
 
 CONFIG_CONSTANTS = (
@@ -125,21 +120,53 @@ class Delay (defer.Deferred) :
 # create the poller
 poller = udp.Poller()
 
-class Openttd (protocol.ProcessProtocol) :
-    def __init__ (self, main, id, *stuff) :
-        self.main = main
-        self.id = id
-        self.startup = None
-        self.running = False
+class Server (protocol.ProcessProtocol) :
+    """
+        I am an OpenTTD server of ours
+    """
 
+    def __init__ (self, main, id, owner_id, owner_name, port, tag_part, name_part, version_id, version_name) :
+        # the ServerManager
+        self.main = main
+
+        # our ID
+        self.id = id
+
+        # our owner
+        self.owner_id = owner_id
+        self.owner_name = owner_name
+
+        # some other info from the DB
+        self.port = port
+        self.tag_part = tag_part
+        self.name_part = name_part
+        self.version_id = version_id
+        self.version_name = version_name
+
+        # set the server name
+        self.server_name = self._fmtServerName(owner_name, tag_part, name_part)
+
+        # a deferred that's set when launching and callbacked once it's running
+        self.startup = None
+
+        # the are-we-running-or-not flag
+        self.running = False
+        
+        # the currently loaded game, or None
         self.game_id = None
+
+        # the date of the currently loaded save, or None (if game_id is not None, and this is, it means it's an autosave)
         self.save_date = None
+
+        # are we running a freshly generated random map?
         self.random_map = None
+
+        # is this a custom savegame that the user has uploaded onto this server?
         self.custom_save = None
         
+        # command stuff
         self.out_queue = []
         self.out_wait = False
-
         self.cmd_count = 1
         self.cmd_queue = []
         self.cmd_deferred = None
@@ -147,34 +174,16 @@ class Openttd (protocol.ProcessProtocol) :
         self.reply_buffer = []
         self.delim_token = None
         
+        # the filesystem path to our server dir
         self.path = '%s/servers/%d' % (BASE_PATH, self.id)
 
-        self._setStuff(*stuff)
-        
+        # cached values of various OpenTTD variables
         self._var_cache = {}
-
-    def _setStuff (self, username, server_name, port, advertise, password, version, owner_uid, url, version_id) :
-        self.username = username
-        self._server_name = server_name
-        self.url = url
-        self.server_name = "%s.myottd.net%s - %s" % (username, url and '/%s' % url or '', server_name)
-        self.port = port
-        self.advertise = advertise
-        self.password = password
-        self.version = version
-        self.owner_uid = owner_uid
-
-        # new naming convention
-        self.owner_part     = username
-        self.tag_part       = url
-        self.name_part      = server_name
-        self.version_id     = version_id
-        self.version_name   = version
 
     def log (self, msg) :
         print '%d: %s' % (self.id, msg)
 
-    def start (self, savegame=None, _fetchDb=True) :
+    def start (self, savegame=None) :
         """
             Prepare the environment and start the openttd server
         """
@@ -203,21 +212,6 @@ class Openttd (protocol.ProcessProtocol) :
 
         self.random_map = (savegame is None)
 
-        if _fetchDb :
-            db.query(SERVER_QUERY_BASE + " AND s.id=%s", self.id).addCallback(self._gotServerSettings, savegame)
-        else :
-            self._start2(savegame)
-
-        return self.startup
-
-    def _gotServerSettings (self, res, savegame) :
-        row = res[0]
-
-        self._setStuff(*(row[1:]))  # chop off the id column
-
-        self._start2(savegame)
-
-    def _start2 (self, savegame=None) :
         self.checkFilesystem()
         self.updateConfig()
 
@@ -228,6 +222,8 @@ class Openttd (protocol.ProcessProtocol) :
         
         self.log("starting openttd... with args: ./%s" % " ".join(args))
         reactor.spawnProcess(self, '%s/openttd' % self.path, args=args, path=self.path, usePTY=True)
+        
+        return self.startup
 
     def checkFilesystem (self) :
         """
@@ -242,7 +238,7 @@ class Openttd (protocol.ProcessProtocol) :
             shutil.copytree('%s/servers/skel' % BASE_PATH, self.path, symlinks=True)
         
         ver_symlink_path = '%s/openttd_version' % self.path
-        version_path = '%s/openttd/%s' % (BASE_PATH, self.version)
+        version_path = '%s/openttd/%s' % (BASE_PATH, self.version_name)
         cur_version_path = os.path.normpath(os.path.join(os.path.dirname(self.path + '/'), os.readlink(ver_symlink_path)))
         cur_version = cur_version_path.split('/')[-1]
 
@@ -251,9 +247,16 @@ class Openttd (protocol.ProcessProtocol) :
             os.unlink(ver_symlink_path)
             os.symlink(version_path, ver_symlink_path)
         else :
-            self.log("version '%s' == '%s', '%s' == '%s'" % (cur_version, self.version, cur_version_path, version_path))
+            self.log("version '%s' == '%s', '%s' == '%s'" % (cur_version, self.version_name, cur_version_path, version_path))
     
     def _getConfigValue (self, config, section, key, type, new_value=None, type_data=None) :
+        """
+            Method to read a config value and possibly the new value for said config var
+
+            TODO: move all of this into a config.py file and write an INI parser that doesn't choke
+                  on the format that OpenTTD uses
+        """
+
         try :
             default = None
 
@@ -263,7 +266,7 @@ class Openttd (protocol.ProcessProtocol) :
 
                 value = config.get(section, key)
 
-                print "value for str %s.%s is: %s" % (section, key, repr(value))
+#                print "value for str %s.%s is: %s" % (section, key, repr(value))
                 
                 if new_value is None :
                     new_value_raw = default
@@ -355,7 +358,7 @@ class Openttd (protocol.ProcessProtocol) :
 
         config_path = '%s/openttd.cfg' % self.path
 
-        self.log('updating openttd.cfg...')
+        #self.log('updating openttd.cfg...')
 
         config = ConfigParser.RawConfigParser()
         config.read([config_path])
@@ -368,11 +371,9 @@ class Openttd (protocol.ProcessProtocol) :
             
             value, new_value_raw = self._getConfigValue(config, section, key, type, new_value)
                     
-            self.log('   %10s.%-20s: %20s -> %-20s' % (section, key, value, new_value))
-
             if value != new_value :
                 dirty = True
-                self.log('    changed!')
+                self.log('   %10s.%-20s: %20s -> %-20s' % (section, key, value, new_value))
                 config.set(section, key, new_value_raw)
 
         if dirty :
@@ -531,6 +532,9 @@ class Openttd (protocol.ProcessProtocol) :
     def _doApplyConfig_started (self, res, changed) :
         return changed
 
+    #
+    # The process state stuff
+    #
     def connectionMade (self) :
         """
             openttd started
@@ -571,12 +575,28 @@ class Openttd (protocol.ProcessProtocol) :
         else :
             # handle events later, perhaps
             self.log("event: %s" % line)
+            
+    def processEnded (self, reason) :
+        """
+            Shut down
+        """
+
+        self.running = False
+        self.log("ended: %s" % reason)
+
+        db.execute("UPDATE servers SET status='offline' WHERE id=%s", self.id)
+
+        if self.cmd_deferred :
+            self._cmdOver()
     
     def writeLine (self, line) :
         #self.log("write: %s" % line)
         
         self.transport.write(line + '\n')
-
+    
+    #
+    # Command/Response stuff
+    #
     def command (self, cmd, *args) :
         """
             Run the given command on the console and return a deferred that callbacks with a list of the reply lines
@@ -628,18 +648,6 @@ class Openttd (protocol.ProcessProtocol) :
 
         d.callback(buf)
  
-    def processEnded (self, reason) :
-        """
-            Shut down
-        """
-
-        self.running = False
-        self.log("ended: %s" % reason)
-
-        db.execute("UPDATE servers SET status='offline' WHERE id=%s", self.id)
-
-        if self.cmd_deferred :
-            self._cmdOver()
     
     # cd command
     def cmdCd (self, dir) :
@@ -722,8 +730,10 @@ class Openttd (protocol.ProcessProtocol) :
 
     def _doRestart_stopped (self, res, savegame) :
         self.start(savegame)
-           
-    # Game-based perspective
+    
+    #
+    # Savegame stuff
+    #
     def _getNewestSave (self, game_id) :
         """
             Returns an (date, dir, fname) tuple
@@ -850,9 +860,13 @@ class Openttd (protocol.ProcessProtocol) :
         return None
     
     #
-    # console commands
+    # OpenTTD variables
     #
     def getVar (self, name, cache=True) :
+        """
+            Get the value of the given variable, will be read from a cache by default
+        """
+
         if cache and name in self._var_cache :
             return defer.succeed(self._var_cache[name])
         else :
@@ -874,8 +888,15 @@ class Openttd (protocol.ProcessProtocol) :
         return None
 
     def setVar (self, name, value) :
+        """
+            Change the value of the given variable, will be stored in the cache
+        """
+
         if isinstance(value, basestring) :
             value = str(value).strip()
+
+        if not value :
+            raise ValueError("The value for variable '%s' cannot be blank" % name)
 
         return self.command(name, value).addCallback(self._setVar_result, name, value)
 
@@ -895,20 +916,32 @@ class Openttd (protocol.ProcessProtocol) :
         return None
 
     #
-    # Utility functions to handle internal info for the below functions
+    # Methods to handle complex internal state info for use by the rpc* methods
     #
-    def setServerName (self, tag, name) :
-        self.tag_part = tag
-        self.name_part = name
 
+    def _fmtServerName (self, username, tag, name) :
         if tag :
             tag = "/%s" % tag
 
-        server_name = "%s.myottd.net%s - %s" % (self.owner_part, tag, self.name_part)
+        return "%s.myottd.net%s - %s" % (username, tag, name)
+       
+    def setServerName (self, tag, name) :
+        """
+            Set the server name from the given tag, name and the owner username (which can't change)
+        """
+
+        self.tag_part = tag
+        self.name_part = name
+        
+        server_name = self._fmtServerName(self.owner_name, tag, name)
 
         return self.setVar('server_name', server_name)
 
-    def getSavegameInfo (self) :         
+    def getSavegameInfo (self) :
+        """
+            Returns an {id -> [date_stamp]} dict
+        """
+
         games = {}
 
         for dirpath, dirnames, filenames in os.walk("%s/save" % self.path) :
@@ -930,6 +963,10 @@ class Openttd (protocol.ProcessProtocol) :
         return games
 
     def getNewgrfConfig (self) :
+        """
+            Returns a newgrf_path, [(fpath, loaded, params)] tuple
+        """
+
         newgrf_path = "%s/data" % self.path
         newgrfs = []
         config = ConfigParser.RawConfigParser()
@@ -951,7 +988,7 @@ class Openttd (protocol.ProcessProtocol) :
                 path = os.path.join(dirpath, dir)
 
                 if os.path.islink(path) :
-                    self.log("recursing into %s" % path)
+                    #self.log("recursing into %s" % path)
                     queue.extend(os.walk(path))
 
             for fname in filenames :
@@ -1010,8 +1047,8 @@ class Openttd (protocol.ProcessProtocol) :
 
             # internal pieces of data
             id              = self.id,
-            owner_id        = self.owner_uid,
-            owner           = self.owner_part,
+            owner_id        = self.owner_id,
+            owner           = self.owner_name,
             tag_part        = self.tag_part,
             name_part       = self.name_part,
             version_id      = self.version_id,
@@ -1122,7 +1159,8 @@ class Openttd (protocol.ProcessProtocol) :
 
     def rpcApply (self, tag_part, name_part, version_id, password) :
         """
-            Update the game with the given params. Changing the version will require an explicit restart
+            A way to conveniently change a couple core settings, like the server name and password, which can be changed at runtime. 
+            Changing the server will require a explicit restart
         """
         
         if version_id != self.version_id :
@@ -1148,8 +1186,9 @@ class Openttd (protocol.ProcessProtocol) :
 def failure (failure) :
     print 'FAILURE: %s' % failure
 
-COLS = "u.username, s.name, s.port, s.advertise, s.password, o_v.version, u.id, s.url, o_v.id"
-SERVER_QUERY_BASE = "SELECT s.id, %s FROM servers s INNER JOIN users u ON s.owner = u.id INNER JOIN openttd_versions o_v ON s.version = o_v.id WHERE s.enabled" % COLS
+
+COLS = "u.id, u.username, s.port, s.url, s.name, o_v.id, o_v.version"
+SERVER_QUERY_BASE = "SELECT s.id, %s FROM servers s INNER JOIN users u ON s.owner = u.id INNER JOIN openttd_versions o_v ON s.version = o_v.id" % COLS
 
 class ServerManager (object) :
     def __init__ (self) :
@@ -1157,11 +1196,6 @@ class ServerManager (object) :
         self.rpc = rpc.Site(self)
 
         db.query(SERVER_QUERY_BASE).addCallback(self._gotServers).addErrback(failure)
-
-    def _startServer (self, row, sg=None) :
-        id = row[0]
-        s = self.servers[id] = Openttd(self, *row)
-        return s.start(sg, _fetchDb=False)
 
     def _gotServers (self, rows) :
         if not rows :
@@ -1174,6 +1208,10 @@ class ServerManager (object) :
             print 'found server %d' % id
             self._startServer(row)
 
+    def initServer (self, id, **opts) :
+       s = self.servers[id] = Server(self, id, **opts)
+
+       return s.start()
 
     def startServer (self, id, sg=None) :
         if id in self.servers :
@@ -1188,7 +1226,14 @@ class ServerManager (object) :
         row = res[0]
 
         return self._startServer(row, sg)
-    
+ 
+    def _startServer (self, row, sg=None) :
+        id = row[0]
+
+        s = self.servers[id] = Server(self, *row)
+
+        return s.start(sg)
+   
     def stopServer (self, id) :
         return self.servers[id].stop()
 

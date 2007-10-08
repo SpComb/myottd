@@ -62,8 +62,9 @@ def reply (request, type, params) :
 class RpcResource (resource.Resource) :
     isLeaf = True
 
-    def __init__ (self, main) :
+    def __init__ (self, main, name) :
         self.main = main
+        self.name = name
 
         resource.Resource.__init__(self)
 
@@ -81,11 +82,25 @@ class RpcResource (resource.Resource) :
         """
             This is the method that you implement
         """
+
+        self.act(**kwargs).addCallback(self.result, req).addErrback(self.failure, req)
         
+    def result (self, res, request) :
+        reply(request, self.name, res)
+        
+        return res
+
     def failure (self, failure, request) :
         error(request, failure.type.__name__, str(failure.value))
         
         return failure
+
+    def act (self, **kwargs) :
+        abstract
+
+class InitQuery (RpcResource) :
+    def act (self, id, **opts) :
+        return self.main.initServer(id, **opts)
 
 class StartQuery (RpcResource) :
     def render_RPC (self, request, id, sg=None) :
@@ -193,19 +208,23 @@ class Site (server.Site) :
 
         root = self.root = resource.Resource()
 
-        root.putChild('start', StartQuery(main))
-        root.putChild('stop', StopQuery(main))
-        root.putChild('restart', RestartQuery(main))
-        root.putChild('servers', ServersQuery(main))
-        root.putChild('server_info', ServerInfoQuery(main))
-        root.putChild('admin_info', AdminInfoQuery(main))
-        root.putChild('apply', ApplyQuery(main))
-        root.putChild('save_game', SaveGameQuery(main))
-        root.putChild('load_game', LoadGameQuery(main))
-        root.putChild('config', ConfigQuery(main))
-        root.putChild('config_apply', ConfigApplyQuery(main))
-        root.putChild('newgrfs', NewgrfsQuery(main))
-        root.putChild('load_save', LoadSaveQuery(main))
+        def res (name, cls) :
+            root.putChild(name, cls(main, name))
+        
+        res('init', InitQuery)
+        res('start', StartQuery)
+        res('stop', StopQuery)
+        res('restart', RestartQuery)
+        res('servers', ServersQuery)
+        res('server_info', ServerInfoQuery)
+        res('admin_info', AdminInfoQuery)
+        res('apply', ApplyQuery)
+        res('save_game', SaveGameQuery)
+        res('load_game', LoadGameQuery)
+        res('config', ConfigQuery)
+        res('config_apply', ConfigApplyQuery)
+        res('newgrfs', NewgrfsQuery)
+        res('load_save', LoadSaveQuery)
 
         server.Site.__init__(self, root)
 
