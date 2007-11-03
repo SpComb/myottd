@@ -243,6 +243,9 @@ class Server (protocol.ProcessProtocol) :
         ]))
     
     # RPC
+    def getConfig (self) :
+        return self.config.getConfig()
+
     def applyNewgrfs (self, newgrfs) :
         """
             Modify the config file to run the specified set of newgrfs
@@ -974,7 +977,10 @@ class ServerManager (object) :
 
     def startServer (self, id, sg=None) :
         if id in self.servers :
-            return self.servers[id].start(sg)
+            s = self.servers[id]
+            s.enabled = True
+
+            return s.start(sg)
         else :
             return db.query(SERVER_QUERY_BASE + " AND s.id=%s", id).addCallback(self._gotServerInfo, id, sg)
 
@@ -988,10 +994,13 @@ class ServerManager (object) :
  
     def _startServer (self, row, sg=None) :
         id = row[0]
-
-        s = self.servers[id] = Server(self, *row)
-
-        return s.start(sg)
+        
+        try :
+            s = self.servers[id] = Server(self, *row)
+            return s.start(sg)
+        except Exception, e :
+            print "Error starting server %d: %s" % (id, e)
+            return defer.fail(e)
    
     def stopServer (self, id) :
         return self.servers[id].stop()

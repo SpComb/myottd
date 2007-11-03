@@ -1,5 +1,7 @@
 from _ordereddict import ordereddict
-import re
+
+import os.path
+import cPickle
 
 # these are settings that should be be changeable by the user
 HIDDEN_SETTINGS = (
@@ -51,7 +53,7 @@ class Config (object) :
             Updates the cfg_categories, value_types, diff_settings and diff_levels instance attributes
         """
         
-        config_info_path = '%s/openttd_version/cfg_info.dat' % self.path
+        config_info_path = '%s/openttd_version/cfg_info.dat' % self.server.path
         config_info_mtime = os.path.getmtime(config_info_path)
 
         if not self.config_info_cache or self.config_info_cache_age < config_info_mtime :
@@ -88,7 +90,7 @@ class Config (object) :
                 sectionName = line.strip('[]')
                 section = self.sections[sectionName] = ordereddict()
             else :
-                if not section :
+                if section is None :
                     raise Exception("not in a section while parsing %r" % line)
 
                 if '=' in line :
@@ -110,7 +112,7 @@ class Config (object) :
                     elif type == 'int' :
                         value = int(value)
                     elif type == 'bool' :
-                        value = bool(('false', 'true').index(value.lower()))    # kek bur
+                        value = bool(['false', 'true'].index(value.lower()))    # kek bur
                     elif type == 'intlist' :
                         value = [int(x) for x in value.split(',')]
                     elif type == 'omany' :
