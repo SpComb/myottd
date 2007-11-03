@@ -122,7 +122,7 @@ class MeController (BaseController) :
 
         if file != '' :
             if re.match('[a-z0-9_, -]+.sav', file.filename, re.I) :
-                server_info = rpc.server_info(id)
+                server_info = rpc.invoke('admin_info', id=id)
 
                 save_path = server_info['custom_save_path']
 
@@ -214,7 +214,7 @@ class MeController (BaseController) :
 
         if file != '' :
             if re.match('[a-z0-9_-]+.grf', file.filename, re.I) :
-                server_info = rpc.server_info(id)
+                server_info = rpc.invoke('admin_info', id=id)
 
                 newgrf_path = server_info['newgrf_path']
 

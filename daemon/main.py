@@ -20,7 +20,6 @@ from twisted.internet import reactor, protocol, defer
 import os
 import os.path
 import shutil
-import ConfigParser
 from datetime import date
 import re
 import cPickle
@@ -31,40 +30,17 @@ import db
 from settings import BASE_PATH
 import udp
 
+import config
+
 SIGTERM = 15
 
 CONFIG_SETTINGS = (
-    ('server_name', 'network',   'server_name',        'str'    ),
-    ('port',        'network',   'server_port',        'int'    ),
+    ('server_name', 'network',   'server_name'),
+    ('port',        'network',   'server_port'),
 )
 
 CONFIG_CONSTANTS = (
     ('network', 'lan_internet', 0),
-)
-
-HIDDEN_SETTINGS = (
-    ("network", "server_name"),
-    ("network", "server_port"),
-    ("network", "server_bind_ip"),
-    ("network", "connect_to_ip"),
-    ("patches", "keep_all_autosave"),
-    ("patches", "screenshot_format"),
-    ("patches", "max_num_autosaves"),
-    ("patches", "fullscreen"),
-    ("patches", "autosave_on_exit"),
-#    ("patches", ""),
-    ("misc", "sounddriver"),
-    ("misc", "videodriver"),
-    ("misc", "savegame_format"),
-    ("misc", "musicdriver"),
-    ("misc", "resolution"),
-    ("misc", "display_opt"),
-    ("misc", "language"),
-    ("music", "custom_1"),
-    ("music", "custom_2"),
-#    ("misc", ""),
-#    ("", ""),
-    ("interface", "*"),
 )
 
 BUILTIN_NEWGRFS = [
@@ -85,10 +61,6 @@ BUILTIN_NEWGRFS = [
     'opntitle.dat',
     'trkfoundw.grf'
 ]
-
-# monkey-patch ConfigParser to not fail on value-less settings
-ConfigParser.RawConfigParser.OPTCRE = re.compile(r'(?P<option>[^:=\s][^:=]*)\s*(?P<vi>[:=]?)\s*(?P<value>.*)$')
-ConfigParser.RawConfigParser.optionxform = str
 
 def ignoreResult (callable) :
     def _wrap (*args) :
@@ -183,6 +155,10 @@ class Server (protocol.ProcessProtocol) :
         # cached values of various OpenTTD variables
         self._var_cache = {}
 
+        # the config
+        self.config = config.Config(self)
+        self.config.read()
+
     def log (self, msg) :
         print '%d: %s' % (self.id, msg)
 
@@ -256,196 +232,17 @@ class Server (protocol.ProcessProtocol) :
         else :
             self.log("version '%s' == '%s', '%s' == '%s'" % (cur_version, self.version_name, cur_version_path, version_path))
     
-    def _getConfigValue (self, config, section, key, type, new_value=None, type_data=None) :
-        """
-            Method to read a config value and possibly the new value for said config var
-
-            TODO: move all of this into a config.py file and write an INI parser that doesn't choke
-                  on the format that OpenTTD uses
-        """
-
-        try :
-            default = None
-
-            if type == 'str' :
-                if type_data :
-                    default = type_data
-
-                value = config.get(section, key)
-
-#                print "value for str %s.%s is: %s" % (section, key, repr(value))
-                
-                if new_value is None :
-                    new_value_raw = default
-                else :
-                    new_value_raw = new_value
-
-            elif type == 'int' :
-                if type_data :
-                    min, default, max = type_data
-
-                value = config.getint(section, key)
-                
-                if new_value is None :
-                    new_value_raw = default
-                elif not type_data or (min <= new_value or min == -1) and (new_value <= max or max == -1) :
-                    new_value_raw = new_value
-                else :
-                    raise ValueError("Value `%d' for '%s.%s' not in range (%d - %d)" % (new_value, section, key, min, max))
-
-            elif type == 'bool' :
-                if type_data :
-                    default = type_data
-
-                value = config.getboolean(section, key)
-
-                if new_value is None :
-                    new_value_raw = default
-                elif new_value :
-                    new_value_raw = 'true'
-                else :
-                    new_value_raw = 'false'
-
-            elif type == 'intlist' :
-                if type_data :
-                    length = type_data
-                    default = ','.join(['0' for x in xrange(length)])
-
-                value = config.get(section, key)
-
-                value = [int(x) for x in value.split(',')]
-
-                if new_value :
-                    new_value_raw = ','.join([str(x) for x in new_value])
-                else :
-                    new_value_raw = default
-            
-            elif type == 'omany' :
-                if type_data :
-                    default, valid = type_data
-
-                value = config.get(section, key)
-
-                if new_value is None:
-                    new_value_raw = default
-                elif not type_data or new_value in valid :
-                    new_value_raw = str(new_value)
-                else :
-                    raise ValueError("`%s' is not valid (%s)" % (value, ', '.join(valid)))
-                    
-            elif type == 'mmany' :
-                if type_data :
-                    default, valid = type_data
-
-                value = config.get(section, key).split('|')
-
-                if new_value is None :
-                    new_value_raw = default
-                else :
-                    if type_data :
-                        invalid = [x for x in new_value if x not in valid]
-
-                    if not type_data or not invalid :
-                        new_value_raw = '|'.join(new_value)
-                    else :
-                        raise ValueError("Values %s are not valid (%s)" % (', '.join(["`%s'" % x for x in invalid]), ', '.join(valid)))
-
-            else :
-                raise ValueError(type)
-
-            return value, new_value_raw
-
-        except ConfigParser.NoOptionError :
-            return default, default
 
     def updateConfig (self) :
         """
             Update the openttd.cfg with the new config vlues
         """
 
-        config_path = '%s/openttd.cfg' % self.path
-
-        #self.log('updating openttd.cfg...')
-
-        config = ConfigParser.RawConfigParser()
-        config.read([config_path])
-
-        dirty = False
-
-
-        for attr_name, section, key, type in CONFIG_SETTINGS :
-            new_value = getattr(self, attr_name)
-            
-            value, new_value_raw = self._getConfigValue(config, section, key, type, new_value)
-                    
-            if value != new_value :
-                dirty = True
-                self.log('   %10s.%-20s: %20s -> %-20s' % (section, key, value, new_value))
-                config.set(section, key, new_value_raw)
-
-        if dirty :
-            self.log('writing out new openttd.cfg')
-            fo = open(config_path, 'w')
-            config.write(fo)
-            fo.close()
-       
-        return dirty
+        self.config.applyConfig(dict([
+            ("%s.%s" % (section, key), getattr(self, attr_name)) for (attr_name, section, key) in CONFIG_SETTINGS
+        ]))
     
     # RPC
-    def _loadConfigInfo (self) :
-        config_path = '%s/openttd.cfg' % self.path
-        patch_path = '%s/openttd_version/cfg_info.dat' % self.path
-
-#        self.log('reading openttd.cfg...')
-
-        config = ConfigParser.RawConfigParser()
-        config.read([config_path])
-    
-#        self.log("reading patches.dat...")
-        
-        fh = open(patch_path, 'r')
-        categories, diff_settings, diff_levels = cPickle.load(fh)
-        fh.close()
-
-        return config, categories, diff_settings, diff_levels
-    
-    def _writeConfigObj (self, config) :
-        config_path = '%s/openttd.cfg' % self.path
-
-        fo = open(config_path, 'w')
-        config.write(fo)
-        fo.close()
-
-    def getConfig (self) :
-        """
-            Returns a category_name -> [(name, type, type_data, value, descr)] dict
-        """
-
-        config, categories, diff_settings, diff_levels = self._loadConfigInfo()
-        self.log("computing config...")
-
-        ret = []
-        
-        for cat_name, patches in categories :
-            if (cat_name, "*") in HIDDEN_SETTINGS :
-                continue
-                
-            out = []
-
-            for section, key, type, type_data, str in patches :
-                if (section, key) in HIDDEN_SETTINGS :
-                    continue
-
-                value, _ = self._getConfigValue(config, section, key, type)
-
-                key = "%s.%s" % (section, key)
-
-                out.append((key, type, type_data, value, str))
-            
-            ret.append((cat_name, out))
-
-        return ret, diff_settings, diff_levels
-
     def applyNewgrfs (self, newgrfs) :
         """
             Modify the config file to run the specified set of newgrfs
@@ -457,17 +254,8 @@ class Server (protocol.ProcessProtocol) :
             return self._doApplyNewgrfs_stopped(None, new_config, False)
 
     def _doApplyNewgrfs_stopped (self, res, newgrfs, start) :
-        config = ConfigParser.RawConfigParser()
-        config.read(['%s/openttd.cfg' % self.path])
-        
-        config.remove_section('newgrf')
-        config.add_section('newgrf')
-        
-        self.log("applying newgrfs: %s" % (newgrfs, ))
-        for newgrf, params in newgrfs :
-            config.set('newgrf', newgrf, params)
-
-        self._writeConfigObj(config)
+        self.config.setNewgrfs(newgrfs)
+        self.config.write()
 
         if start :
             return self.start().addCallback(self._doApplyNewgrfs_started)
@@ -488,42 +276,8 @@ class Server (protocol.ProcessProtocol) :
             return self._doApplyConfig_stopped(None, new_config, False, start_new)
 
     def _doApplyConfig_stopped (self, res, new_config, start, start_new) :
-        config, categories, diff_settings, diff_levels = self._loadConfigInfo()
-        
-        config_types = {}
+        changed = self.config.applyConfig(new_config)
 
-        for cat_name, patches in categories :
-            if (cat_name, "*") in HIDDEN_SETTINGS :
-                continue
-                
-            out = []
-
-            for section, key, type, type_data, str in patches :
-                if (section, key) in HIDDEN_SETTINGS :
-                    continue
-
-                config_types["%s.%s" % (section, key)] = type, type_data
-        
-        print "applying %d config items (%d known items)" % (len(new_config), len(config_types))
-
-        changed = {}
-
-        for key, value in new_config.iteritems() :
-            section, name = key.split('.', 1)
-
-            type, type_data = config_types[key]
-
-            cur_value, new_value_raw = self._getConfigValue(config, section, name, type, value, type_data)
-
-            config.set(section, name, new_value_raw)
-
-            if cur_value != value :
-                changed[key] = (cur_value, value)
-        
-        print "writing out, %d changed: %s" % (len(changed), changed)
-
-        self._writeConfigObj(config)
-        
         if start_new :
             sg = False
         else :
@@ -974,13 +728,9 @@ class Server (protocol.ProcessProtocol) :
 
         newgrf_path = "%s/data" % self.path
         newgrfs = []
-        config = ConfigParser.RawConfigParser()
-        config.read(['%s/openttd.cfg' % self.path])
         
         # newgrf info from the config file
-        cfg_grfs = {}
-        for name, params in config.items('newgrf') :
-            cfg_grfs[name] = params
+        cfg_grfs = dict(self.config.getNewgrfs())
         
         # from the filesystem
         self.log("looking for .grfs in %s" % newgrf_path)
@@ -1075,8 +825,12 @@ class Server (protocol.ProcessProtocol) :
         else :
             return defer.succeed(None)
 
-    def _rpcGetDetails_gotInfo (self, (info, newgrfs)) :
-        return poller.getDetails("127.0.0.1", self.port).addCallback(self._rpcGetDetails_gotDetails, info, newgrfs)
+    def _rpcGetDetails_gotInfo (self, ret) :
+        if ret :
+            info, newgrfs = ret
+            return poller.getDetails("127.0.0.1", self.port).addCallback(self._rpcGetDetails_gotDetails, info, newgrfs)
+        else :
+            return None
 
     def _rpcGetDetails_gotDetails (self, (host, port, details), info, newgrfs) :
         info.update(dict(
