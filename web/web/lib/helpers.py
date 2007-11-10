@@ -41,6 +41,9 @@ def fmtTimestamp (ts) :
     return datetime.fromtimestamp(ts).strftime("%Y/%m/%d %H:%M")
 
 def fmtDatestamp (ds) :
+    # TODO: fix this to be a str, not an int for save_date
+    ds = str(ds)
+
     if ds :
         return date(year=int(ds[0:4]), month=int(ds[4:6]), day=int(ds[6:8])).strftime("%b %d %Y")
     else :

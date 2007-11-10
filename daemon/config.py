@@ -112,7 +112,13 @@ class Config (object) :
                     elif type == 'int' :
                         value = int(value)
                     elif type == 'bool' :
-                        value = bool(['false', 'true'].index(value.lower()))    # kek bur
+                        value = value.lower()
+                        if value in ('true', '1', 'on', 'yes') :
+                            value = True
+                        elif value in ('false', '0', 'off', 'no') :
+                            value = False
+                        else :
+                            raise Exception("What kind of bool value is %r?" % value)
                     elif type == 'intlist' :
                         value = [int(x) for x in value.split(',')]
                     elif type == 'omany' :

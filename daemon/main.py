@@ -41,6 +41,7 @@ CONFIG_SETTINGS = (
 
 CONFIG_CONSTANTS = (
     ('network', 'lan_internet', 0),
+    ('network', 'min_players', 1),
 )
 
 BUILTIN_NEWGRFS = [
@@ -157,6 +158,10 @@ class Server (protocol.ProcessProtocol) :
 
         # the config
         self.config = config.Config(self)
+        
+        # must do this before trying to read the config
+        self.checkFilesystem()
+
         self.config.read()
 
     def log (self, msg) :
@@ -195,8 +200,8 @@ class Server (protocol.ProcessProtocol) :
 
         self.random_map = (savegame is None)
 
-        self.checkFilesystem()
         self.updateConfig()
+        self.checkFilesystem()
 
         args = ['openttd', '-D']
         
@@ -240,6 +245,9 @@ class Server (protocol.ProcessProtocol) :
 
         self.config.applyConfig(dict([
             ("%s.%s" % (section, key), getattr(self, attr_name)) for (attr_name, section, key) in CONFIG_SETTINGS
+        ]))
+        self.config.applyConfig(dict([
+            ("%s.%s" % (section, key), value) for (section, key, value) in CONFIG_CONSTANTS
         ]))
     
     # RPC
