@@ -98,7 +98,7 @@ COOKIE_DOMAIN = CONFIG.current_conf()['app_conf']['cookie_domain']
 def _my_create_id (self) :
     # copy-pasted from session.py
     self.id = md5.new(
-        md5.new("%f%s%f%d" % (time.time(), id({}), random.random(), os.getpid()) ).hexdigest(), 
+        "%f%s%f%d" % (time.time(), id({}), random.random(), os.getpid())
     ).hexdigest()
     self.is_new = True
     if self.use_cookies:
@@ -117,7 +117,8 @@ def _my_create_id (self) :
             self.cookie[self.key]['expires'] = expires.strftime("%a, %d-%b-%Y %H:%M:%S GMT" )
         
         self.request.headers_out.add('set-cookie', self.cookie[self.key].output(header=''))
-
+        
+        print "--- headers: ", repr(self.request.headers_out.headers)
 Session._create_id = _my_create_id
 
 # Include the '_' function in the public names

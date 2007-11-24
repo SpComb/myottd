@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+
 # Copyright 2007 Tero Marttila
 #
 # This file is part of MyOTTD.
@@ -14,8 +16,6 @@
 #
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
-
-#!/usr/bin/env python
 
 import os, os.path
 import re
@@ -348,7 +348,7 @@ def main (version) :
     print "Handling OpenTTD version %s" % version
     
     lang, next = load_lang(os.path.join(version, "lang", "english.txt"))
-    patches = handle_settings(os.path.join(version, "settings.c"), lang)
+    patches = handle_settings(os.path.join(version, "settings.cpp"), lang)
     categories = handle_categories(os.path.join(version, "settings_gui.c"), patches, lang)
     diff_settings, diff_levels = calc_difficulties(os.path.join(version, "settings_gui.c"), lang, next)
     

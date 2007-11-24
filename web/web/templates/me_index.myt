@@ -40,12 +40,12 @@
     <form action="<% h.url_for('admin_server_add') %>" method="POST">
         <label for="tag">Tag</label>
         <input type="text" name="tag" onchange="changed()" />
-        <span class="hint">letters, numbers, some punctuation only, may be blank</span>
+        <span class="hint">A short tag to tell servers apart. Letters, numbers, some punctuation only, may be blank for one server</span>
         <br/>
 
         <label for="name">Title</label>
         <input type="text" name="name" onchange="changed()" />
-        <span class="hint">required</span>
+        <span class="hint">A suitable descriptive title. Required</span>
         <br/>
 
         <label for="version">Version</label>
