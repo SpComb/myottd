@@ -132,18 +132,6 @@ Index: src/network/network.cpp
  
  	switch (action) {
  		case NETWORK_ACTION_SERVER_MESSAGE:
-Index: src/openttd.h
-===================================================================
---- src/openttd.h	(revision 11515)
-+++ src/openttd.h	(working copy)
-@@ -62,6 +62,7 @@
- typedef uint16 RoadStopID;
- typedef uint16 TownID;
- typedef uint16 IndustryID;
-+#include "stdafx.h"
- typedef uint16 DepotID;
- typedef uint16 WaypointID;
- typedef uint16 OrderID;
 Index: src/api.cpp
 ===================================================================
 --- src/api.cpp	(revision 0)
