@@ -10,6 +10,15 @@ function init (x, y, w, h, tw, th) {
     g_tw = tw;
     g_th = th;
 
+    if (document.baseURI.indexOf("#") >= 0) {
+        target = document.baseURI.split("#", 2);
+        asdf = target[1].split("_", 2);
+
+        g_x += parseInt(asdf[0]);
+        g_y += parseInt(asdf[1]);
+
+    }
+
     viewp = $("viewport");
     subs = $("substrate");
     
@@ -21,13 +30,10 @@ function init (x, y, w, h, tw, th) {
     });
 
     g_loaded = [];
+    g_idle = true;
 
-    for (col = 0; col < g_w; col++) {
-        for (row = 0; row < g_h; row++) {
-            load_tile(col, row);
-        }
-    }
-    
+    check_tiles();
+
     g_debug_enabled = false;
     
     if (g_debug_enabled) {
@@ -58,7 +64,8 @@ function mark_tile (col, row) {
 
 function load_tile (col, row) {
     e = document.createElement("img");
-    e.src = "/tile_img?x=" + (g_x + col) + "&y=" + (g_y + row);
+    e.src = "/openttd_img?x=" + ((g_x + col)*g_tw) + "&y=" + ((g_y + row)*g_th) + "&w=" + g_tw + "&h=" + g_th + "&z=0";
+    e.id = "tile_" + col + "_" + row;
     e.title = "(" + col + ", " + row + ")"
     e.style.top = g_th * row;
     e.style.left = g_tw * col;
@@ -66,6 +73,10 @@ function load_tile (col, row) {
     subs.appendChild(e);
 
     mark_tile(col, row);
+}
+
+function touch_tile (col, row) {
+    $("tile_" + col + "_" + row).src = "/openttd_img?x=" + ((g_x + col)*g_tw) + "&y=" + ((g_y + row)*g_th) + "&w=" + g_tw + "&h=" + g_th + "&z=0&ts=" + new Date().getTime();
 }
 
 function check_tiles () {
@@ -86,21 +97,30 @@ function check_tiles () {
         for (row = start_row; row <= end_row; row++) {
             if (!is_loaded(col, row))
                 load_tile(col, row);
+            else
+                touch_tile(col, row);
         }
     }
+
+    if (g_idle)
+        g_timeout = setTimeout(check_tiles, 2000);
 }
 
-var g_drag_timeout;
+var g_timeout, g_idle;
 function viewport_drag_motion (d) {
-    if (g_drag_timeout)
-        clearTimeout(g_drag_timeout);
+    g_idle = false;
 
-    g_drag_timeout = setTimeout(check_tiles, 100);
+    if (g_timeout)
+        clearTimeout(g_timeout);
+
+    g_timeout = setTimeout(check_tiles, 100);
 }
 
 function viewport_drag_end (d) {
-    if (g_drag_timeout)
-        clearTimeout(g_drag_timeout);
+    g_idle = true;
+
+    if (g_timeout)
+        clearTimeout(g_timeout);
 
     check_tiles();
 }

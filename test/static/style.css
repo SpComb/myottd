@@ -17,6 +17,8 @@ table {
 
     border: 1px solid black;
     background-color: #E5E3DF;
+
+    margin: 20px auto;
 }
 
 #substrate {
@@ -27,6 +29,11 @@ table {
 #viewport img {
     border: none;
     position: absolute;
+}
+
+#help {
+    width: 50%;
+    margin: 20px auto;
 }
 
 th {

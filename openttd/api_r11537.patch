@@ -1,0 +1,702 @@
+Index: src/video/dedicated_v.cpp
+===================================================================
+--- src/video/dedicated_v.cpp	(revision 11537)
++++ src/video/dedicated_v.cpp	(working copy)
+@@ -10,6 +10,7 @@
+ #include "../gfx.h"
+ #include "../network/network.h"
+ #include "../window.h"
++#include "../api.h"
+ #include "../console.h"
+ #include "../variables.h"
+ #include "../genworld.h"
+@@ -216,6 +217,12 @@
+ 
+ 	if (_exit_game) return;
+ 
++    if (_binary_api) {
++        // uh, don't try and run this on win32
++        API_ReadReady();
++        return;
++    }
++
+ #if defined(UNIX) || defined(__OS2__) || defined(PSP)
+ 	if (fgets(input_line, lengthof(input_line), stdin) == NULL) return;
+ #else
+Index: src/api.h
+===================================================================
+--- src/api.h	(revision 0)
++++ src/api.h	(revision 0)
+@@ -0,0 +1,18 @@
++
++#ifndef API_H
++#define API_H
++
++VARDEF bool _binary_api;
++
++void API_Init();
++
++// there is data on stdin available for reading
++void API_ReadReady();
++
++void API_ConsoleMessageCmd (const char *msg);
++void API_ConsoleWarningCmd (const char *msg);
++void API_ConsoleErrorCmd (const char *msg);
++void API_ConsoleDebugCmd (const char *category, const char *msg);
++void API_NetworkEventCmd (int action, bool self_send, const char *name, const char *buf);
++
++#endif /* API_H */
+Index: src/console.cpp
+===================================================================
+--- src/console.cpp	(revision 11537)
++++ src/console.cpp	(working copy)
+@@ -15,6 +15,7 @@
+ #include <stdarg.h>
+ #include <string.h>
+ #include "console.h"
++#include "api.h"
+ #include "helpers.hpp"
+ #include "network/network.h"
+ #include "network/network_data.h"
+@@ -373,6 +374,12 @@
+ void IConsolePrint(uint16 color_code, const char *string)
+ {
+ 	char *str;
++    
++    if (_binary_api) {
++        API_ConsoleMessageCmd(string);
++        return;
++    }
++
+ #ifdef ENABLE_NETWORK
+ 	if (_redirect_console_to_client != 0) {
+ 		/* Redirect the string to the client */
+@@ -436,6 +443,11 @@
+  */
+ void IConsoleDebug(const char *dbg, const char *string)
+ {
++    if (_binary_api) {
++        API_ConsoleDebugCmd(dbg, string);
++        return;
++    }
++        
+ 	if (_stdlib_developer > 1)
+ 		IConsolePrintF(_icolour_dbg, "dbg: [%s] %s", dbg, string);
+ }
+@@ -447,6 +459,11 @@
+  */
+ void IConsoleWarning(const char *string)
+ {
++    if (_binary_api) {
++        API_ConsoleWarningCmd(string);
++        return;
++    }
++
+ 	if (_stdlib_developer > 0)
+ 		IConsolePrintF(_icolour_warn, "WARNING: %s", string);
+ }
+@@ -457,6 +474,11 @@
+  */
+ void IConsoleError(const char *string)
+ {
++    if (_binary_api) {
++        API_ConsoleErrorCmd(string);
++        return;
++    }
++
+ 	IConsolePrintF(_icolour_err, "ERROR: %s", string);
+ }
+ 
+Index: src/network/network.cpp
+===================================================================
+--- src/network/network.cpp	(revision 11537)
++++ src/network/network.cpp	(working copy)
+@@ -26,6 +26,7 @@
+ #include "core/tcp.h"
+ #include "core/core.h"
+ #include "network_gui.h"
++#include "../api.h"
+ #include "../console.h" /* IConsoleCmdExec */
+ #include <stdarg.h> /* va_list */
+ #include "../md5.h"
+@@ -136,6 +137,12 @@
+ 	va_start(va, str);
+ 	vsnprintf(buf, lengthof(buf), str, va);
+ 	va_end(va);
++    
++    // redirect to binary API if needed
++    if (_binary_api) {
++        API_NetworkEventCmd(action, self_send, name, buf);
++        return;
++    }
+ 
+ 	switch (action) {
+ 		case NETWORK_ACTION_SERVER_MESSAGE:
+Index: src/api.cpp
+===================================================================
+--- src/api.cpp	(revision 0)
++++ src/api.cpp	(revision 0)
+@@ -0,0 +1,497 @@
++/*
++ * This provides a binary API on stdin/out instead of the human-readable console
++ */
++
++#include <stdio.h>
++#include <string.h>
++
++#include "stdafx.h"
++#include "openttd.h"
++#include "api.h"
++#include "console.h"
++#include "player.h"
++#include "network/network.h"
++#include "screenshot.h"
++#include "viewport.h"
++#include "blitter/factory.hpp"
++#include "map.h"
++#include "string.h"
++
++// has to be after openttd.h, it seems
++#include <arpa/inet.h>
++
++enum API_SendCommands {
++    CMD_OUT_NULL,
++
++    CMD_OUT_CONSOLE,
++    CMD_OUT_WARNING,
++    CMD_OUT_ERROR,
++    CMD_OUT_DEBUG,
++
++    CMD_OUT_NETWORK_EVENT,
++    CMD_OUT_PLAYERS_REPLY,
++    CMD_OUT_SCREENSHOT_REPLY,
++};
++
++enum API_RecvCommands {
++    CMD_IN_NULL,
++
++    CMD_IN_CONSOLE_EXEC,
++    CMD_IN_PLAYERS,
++    CMD_IN_SCREENSHOT,
++};
++
++void API_Init() {
++    
++}
++
++/* write... */
++void API_Write (const char byte) {
++    putc(byte, stdout);
++}
++
++void API_WriteLen (const char *buf, size_t size) {
++    fwrite(buf, size, 1, stdout);
++}
++
++void API_WriteFlush () {
++    fflush(stdout);
++};
++
++void API_WriteCommand (const char command, const unsigned char num_args) {
++    API_Write(command);
++    API_Write(num_args);
++}
++
++void API_WriteBoolean (bool boolean) {
++    API_Write('x');
++    API_Write(boolean);
++}
++
++void API_WriteByte (const char byte) {
++    API_Write('B');
++    API_Write(byte);
++}
++
++void API_WriteShort (const short i) {
++    API_Write('H');
++
++    uint16_t n_i = htons(i);
++
++    fwrite(&n_i, sizeof(n_i), 1, stdout);
++}
++
++void API_WriteInt (const int i) {
++    API_Write('I');
++
++    uint32_t n_i = htonl(i);
++
++    fwrite(&n_i, sizeof(n_i), 1, stdout);
++}
++
++void API_WriteLong (int64 i) {
++    API_Write('Q');
++
++	API_Write(GB(i, 56, 8));
++	API_Write(GB(i, 48, 8));
++	API_Write(GB(i, 40, 8));
++    API_Write(GB(i, 32, 8));
++	API_Write(GB(i, 24, 8));
++	API_Write(GB(i, 16, 8));
++	API_Write(GB(i,  8, 8));
++    API_Write(GB(i,  0, 8));
++}
++
++void API_WriteNumeric (unsigned int i) {
++    if (i < 256)
++        API_WriteByte(i);
++     else if (i < 65536)
++        API_WriteShort(i);
++     else 
++        API_WriteInt(i);
++}
++
++void API_WriteBuffer (const char *buf, size_t size) {
++    API_Write('S');
++    API_WriteNumeric(size);
++    API_WriteLen(buf, size);
++}
++
++void API_WriteString (const char *str) {
++    API_WriteBuffer(str, strlen(str));
++}
++
++void API_WriteListStart () {
++    API_Write('(');
++}
++
++void API_WriteListEnd () {
++    API_Write(')');
++}
++
++void API_WriteArrayHead (size_t size) {
++    API_Write('X');
++    API_Write(size);    
++}
++
++/* read */
++unsigned char API_ReadRawByte() {
++    return fgetc(stdin);
++}
++
++unsigned short API_ReadRawShort() {
++    char buf[2];
++    fread(buf, 2, 1, stdin);
++
++    return ntohs(*((uint16_t *)buf));
++}
++
++unsigned int API_ReadRawInt() {
++    char buf[4];
++    fread(buf, 4, 1, stdin);
++
++    return ntohl(*((uint32_t *)buf));
++}
++
++unsigned int API_ReadNumeric() {
++    char type = API_ReadRawByte();
++
++    switch (type) {
++        case 'B' : return API_ReadRawByte();
++        case 'H' : return API_ReadRawShort();
++        case 'I' : return API_ReadRawInt();
++        default : assert(0);  // blaa
++    }
++}
++
++char* API_ReadString () {
++    size_t size = API_ReadNumeric();
++    char *buf = (char*)malloc(size);
++
++    fread(buf, size, 1, stdin);
++
++    return buf;
++}
++
++/* char API_ReadCommand() {
++    char cmd = API_ReadByte();
++    char num_args = API_ReadByte();
++
++    return cmd;
++} */
++
++/* command hanlders */
++void API_CmdPlayers () {
++ 	Player *p;
++
++	NetworkPopulateCompanyInfo();
++    
++    API_WriteCommand(CMD_OUT_PLAYERS_REPLY, 1);
++    API_WriteListStart();
++
++	FOR_ALL_PLAYERS(p) {
++        const NetworkPlayerInfo *npi = &_network_player_info[p->index];
++		
++        if (!p->is_active) continue;
++
++        API_WriteArrayHead(13);
++
++        API_WriteByte(p->index + 1);                // Player ID
++        API_WriteByte(_player_colors[p->index]);    // Color ID
++        API_WriteString(npi->company_name);         // Company Name
++        API_WriteShort(p->inaugurated_year);        // Year Founded
++        API_WriteLong(p->player_money);             // Money
++        API_WriteLong(p->current_loan);             // Loan
++        API_WriteLong(CalculateCompanyValue(p));    // Company Value
++        API_WriteShort(npi->num_vehicle[0]);        // Trains
++        API_WriteShort(npi->num_vehicle[1]);        // Lorry
++        API_WriteShort(npi->num_vehicle[2]);        // Bus
++        API_WriteShort(npi->num_vehicle[3]);        // Planes
++        API_WriteShort(npi->num_vehicle[4]);        // Ships
++        API_WriteBoolean(StrEmpty(npi->password));  // Protected
++	}
++
++    API_WriteListEnd();
++    API_WriteFlush();
++}
++
++#include <png.h>
++
++// for API_CmdScreenshot
++void _API_CmdScreenshot_write_cb(png_structp png_ptr, png_bytep data, png_size_t length) {
++    API_WriteBuffer((const char *) data, length);
++}
++
++void _API_CmdScreenshot_flush_cb(png_structp png_ptr) {
++    API_WriteFlush();
++}
++
++static void PNGAPI png_my_error(png_structp png_ptr, png_const_charp message)
++{
++	DEBUG(misc, 0, "[libpng] error: %s - %s", message, (char *)png_get_error_ptr(png_ptr));
++	longjmp(png_ptr->jmpbuf, 1);
++}
++
++static void PNGAPI png_my_warning(png_structp png_ptr, png_const_charp message)
++{
++	DEBUG(misc, 1, "[libpng] warning: %s - %s", message, (char *)png_get_error_ptr(png_ptr));
++}
++
++/*
++ * Take a screenshot of the specified section of the main map with the specified zoom.
++ *
++ * Zoom is a value from zero to three, normal, 2x, 4x, 8x
++ */
++void API_CmdScreenshot () {
++    int x = API_ReadNumeric();
++    int y = API_ReadNumeric();
++    unsigned int width = API_ReadNumeric();
++    unsigned int height = API_ReadNumeric();
++    int _zoom = API_ReadNumeric();
++
++    assert(x >= 0);
++    assert(y >= 0);
++    assert(width > 0);
++    assert(height > 0);
++    assert(_zoom >= 0 && _zoom <= 3);
++    // We used methods of copy-paste modularization
++    
++    // from MakeWorldScreenshot
++    ZoomLevel zoom = (ZoomLevel) _zoom;
++    ViewPort vp;
++	DrawPixelInfo dpi, *old_dpi;
++	int wx, left;
++    
++    // set the zoom level
++	vp.zoom = zoom;
++
++    // then the left/top/width/height are in screen coordiantes, i.e. pixels
++	vp.left = ScaleByZoom(-x, zoom);
++	vp.top = ScaleByZoom(-y, zoom);
++	vp.width = width;
++	vp.height = height;
++
++    // these are just a question of scaling by the zoom level
++    vp.virtual_width = ScaleByZoom(width, zoom);
++    vp.virtual_height = ScaleByZoom(height, zoom);
++    
++    // these are more difficult.... what happens if we set them to zero?
++	vp.virtual_left = -(int)MapMaxX() * TILE_PIXELS;
++	vp.virtual_top = 0;
++
++//	sf = _screenshot_formats + _cur_screenshot_format;
++//	return sf->proc(MakeScreenshotName(sf->extension), LargeWorldCallback, &vp, vp.width, vp.height, BlitterFactoryBase::GetCurrentBlitter()->GetScreenDepth(), _cur_palette);
++
++    // from LargeWorldCallback (void *buf, uint y, uint pitch, uint n)
++    
++    // from MakePNGImage (const char *name, ScreenshotCallback *callb, void *userdata, uint w, uint h, int pixelformat, const Colour *palette)
++    uint w = width;
++    uint h = height;
++    int pixelformat = BlitterFactoryBase::GetCurrentBlitter()->GetScreenDepth();
++    const Colour *palette = _cur_palette;
++	png_color rq[256];
++	uint i, y_, n;
++	uint maxlines;
++	uint bpp = pixelformat / 8;
++	png_structp png_ptr;
++	png_infop info_ptr;
++
++	/* only implemented for 8bit and 32bit images so far. */
++	if (pixelformat != 8 && pixelformat != 32) return;
++
++	png_ptr = png_create_write_struct(PNG_LIBPNG_VER_STRING, NULL, png_my_error, png_my_warning);
++
++	if (png_ptr == NULL) {
++        // error handling? What's that?
++        
++//		return false;
++	}
++
++	info_ptr = png_create_info_struct(png_ptr);
++	if (info_ptr == NULL) {
++		png_destroy_write_struct(&png_ptr, (png_infopp)NULL);
++//		return false;
++	}
++
++	if (setjmp(png_jmpbuf(png_ptr))) {
++		png_destroy_write_struct(&png_ptr, &info_ptr);
++//		return false;
++	}
++    
++    // use our custom IO for streaming out the PNG
++    API_WriteCommand(CMD_OUT_SCREENSHOT_REPLY, 1);
++    API_WriteListStart();
++    png_set_write_fn(png_ptr, NULL, &_API_CmdScreenshot_write_cb, &_API_CmdScreenshot_flush_cb);
++
++	png_set_filter(png_ptr, 0, PNG_FILTER_NONE);
++
++	png_set_IHDR(png_ptr, info_ptr, w, h, 8, pixelformat == 8 ? PNG_COLOR_TYPE_PALETTE : PNG_COLOR_TYPE_RGB,
++		PNG_INTERLACE_NONE, PNG_COMPRESSION_TYPE_DEFAULT, PNG_FILTER_TYPE_DEFAULT);
++
++	if (pixelformat == 8) {
++		/* convert the palette to the .PNG format. */
++		for (i = 0; i != 256; i++) {
++			rq[i].red   = palette[i].r;
++			rq[i].green = palette[i].g;
++			rq[i].blue  = palette[i].b;
++		}
++
++		png_set_PLTE(png_ptr, info_ptr, rq, 256);
++	}
++
++	png_write_info(png_ptr, info_ptr);
++	png_set_flush(png_ptr, 512);
++
++	if (pixelformat == 32) {
++		png_color_8 sig_bit;
++
++		/* Save exact color/alpha resolution */
++		sig_bit.alpha = 0;
++		sig_bit.blue  = 8;
++		sig_bit.green = 8;
++		sig_bit.red   = 8;
++		sig_bit.gray  = 8;
++		png_set_sBIT(png_ptr, info_ptr, &sig_bit);
++
++#ifdef TTD_LITTLE_ENDIAN
++		png_set_bgr(png_ptr);
++		png_set_filler(png_ptr, 0, PNG_FILLER_AFTER);
++#else
++		png_set_filler(png_ptr, 0, PNG_FILLER_BEFORE);
++#endif
++	}
++
++	/* use by default 64k temp memory */
++	maxlines = Clamp(65536 / w, 16, 128);
++
++	/* now generate the bitmap bits */
++	void *buff = MallocT<uint8>(w * maxlines * bpp); // by default generate 128 lines at a time.
++	if (buff == NULL) {
++		png_destroy_write_struct(&png_ptr, &info_ptr);
++//		return false;
++	}
++	memset(buff, 0, w * maxlines * bpp);
++
++	y_ = 0;
++	do {
++		/* determine # lines to write */
++		n = min(h - y_, maxlines);
++
++		/* render the pixels into the buffer */
++        old_dpi = _cur_dpi;
++        _cur_dpi = &dpi;
++
++        dpi.dst_ptr = buff;
++        dpi.height = n;
++        dpi.width = width;
++        dpi.pitch = width;
++        dpi.zoom = zoom;
++        dpi.left = 0;
++        dpi.top = y_;
++
++        left = 0;
++        while (vp.width - left != 0) {
++            wx = min(vp.width - left, 1600);
++            left += wx;
++
++            ViewportDoDraw(&vp,
++                ScaleByZoom(left - wx - vp.left, vp.zoom) + vp.virtual_left,
++                ScaleByZoom(y_ - vp.top, vp.zoom) + vp.virtual_top,
++                ScaleByZoom(left - vp.left, vp.zoom) + vp.virtual_left,
++                ScaleByZoom((y_ + n) - vp.top, vp.zoom) + vp.virtual_top
++            );
++        }
++
++        _cur_dpi = old_dpi;
++
++		y_ += n;
++
++		/* write them to png */
++		for (i = 0; i != n; i++)
++			png_write_row(png_ptr, (png_bytep)buff + i * w * bpp);
++	} while (y_ != h);
++
++	png_write_end(png_ptr, info_ptr);
++	png_destroy_write_struct(&png_ptr, &info_ptr);
++
++	free(buff);
++    
++    // finish off the list
++    API_WriteListEnd();
++    API_WriteFlush();
++}
++
++void API_ReadReady() {
++    char cmd = API_ReadRawByte();
++    char num_args = API_ReadRawByte();
++    char arg_type;
++    char *buf;
++
++    switch (cmd) {
++        case CMD_IN_CONSOLE_EXEC :
++            assert(num_args == 1);
++
++            arg_type = API_ReadRawByte();
++
++            assert(arg_type == 'S');
++
++            buf = API_ReadString();
++
++            IConsoleCmdExec(buf);
++
++            free(buf);
++
++            break;
++        case CMD_IN_PLAYERS :
++            assert(num_args == 0);
++
++            API_CmdPlayers();
++
++            break;
++        case CMD_IN_SCREENSHOT :
++            assert(num_args == 5);
++
++            API_CmdScreenshot();
++    };
++}
++
++/* commands */
++void API_ConsoleMessageCmd (const char *msg) {
++    API_WriteCommand(CMD_OUT_CONSOLE, 1);
++    API_WriteString(msg);
++
++    API_WriteFlush();
++}
++
++void API_ConsoleWarningCmd (const char *msg) {
++    API_WriteCommand(CMD_OUT_WARNING, 1);
++    API_WriteString(msg);
++
++    API_WriteFlush();
++}
++
++void API_ConsoleErrorCmd (const char *msg) {
++    API_WriteCommand(CMD_OUT_ERROR, 1);
++    API_WriteString(msg);
++
++    API_WriteFlush();
++}
++
++void API_ConsoleDebugCmd (const char *category, const char *msg) {
++    API_WriteCommand(CMD_OUT_DEBUG, 2);
++    API_WriteString(category);
++    API_WriteString(msg);
++
++    API_WriteFlush();
++}
++
++void API_NetworkEventCmd (int action, bool self_send, const char *name, const char *buf) {
++    API_WriteCommand(CMD_OUT_NETWORK_EVENT, 4);
++    API_WriteByte(action);
++    API_WriteBoolean(self_send);
++    API_WriteString(name);
++    API_WriteString(buf);
++
++    API_WriteFlush();
++}
++
+Index: src/openttd.cpp
+===================================================================
+--- src/openttd.cpp	(revision 11537)
++++ src/openttd.cpp	(working copy)
+@@ -44,6 +44,7 @@
+ #include "airport.h"
+ #include "aircraft.h"
+ #include "console.h"
++#include "api.h"
+ #include "screenshot.h"
+ #include "network/network.h"
+ #include "signs.h"
+@@ -184,7 +185,8 @@
+ 		"  -i                  = Force to use the DOS palette\n"
+ 		"                          (use this if you see a lot of pink)\n"
+ 		"  -c config_file      = Use 'config_file' instead of 'openttd.cfg'\n"
+-		"  -x                  = Do not automatically save to config file on exit\n",
++		"  -x                  = Do not automatically save to config file on exit\n"
++        "  -A                  = Use the binary control API instead of the console\n",
+ 		lastof(buf)
+ 	);
+ 
+@@ -358,6 +360,7 @@
+ 	Year startyear = INVALID_YEAR;
+ 	uint generation_seed = GENERATE_NEW_SEED;
+ 	bool save_config = true;
++    _binary_api = false;
+ #if defined(ENABLE_NETWORK)
+ 	bool dedicated = false;
+ 	bool network   = false;
+@@ -379,7 +382,7 @@
+ 	 *   a letter means: it accepts that param (e.g.: -h)
+ 	 *   a ':' behind it means: it need a param (e.g.: -m<driver>)
+ 	 *   a '::' behind it means: it can optional have a param (e.g.: -d<debug>) */
+-	optformat = "m:s:v:b:hD::n::eit:d::r:g::G:c:xl:"
++	optformat = "m:s:v:b:hD::n::eit:d::r:g::G:c:xl:A"
+ #if !defined(__MORPHOS__) && !defined(__AMIGA__) && !defined(WIN32)
+ 		"f"
+ #endif
+@@ -418,6 +421,7 @@
+ 		case 'l':
+ 			debuglog_conn = mgo.opt;
+ 			break;
++        case 'A': _binary_api = true; break;
+ #endif /* ENABLE_NETWORK */
+ 		case 'r': ParseResolution(resolution, mgo.opt); break;
+ 		case 't': startyear = atoi(mgo.opt); break;
+Index: source.list
+===================================================================
+--- source.list	(revision 11537)
++++ source.list	(working copy)
+@@ -1,5 +1,6 @@
+ # Source Files
+ airport.cpp
++api.cpp
+ articulated_vehicles.cpp
+ autoreplace_cmd.cpp
+ aystar.cpp
+@@ -101,6 +102,7 @@
+ aircraft.h
+ airport.h
+ airport_movement.h
++api.h
+ articulated_vehicles.h
+ autoslope.h
+ aystar.h

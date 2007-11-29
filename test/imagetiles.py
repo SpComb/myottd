@@ -145,6 +145,8 @@ class Root (resource.Resource) :
         end_col = start_col + view_w
         
         tile_w, tile_h = TILE_SIZE
+
+        images = []
         
         return http.Response(stream="""
 <html>
@@ -161,6 +163,15 @@ class Root (resource.Resource) :
                 <div id="substrate">
 %s        
                 </div>
+            </div>
+
+            <div id="help">
+                <p>
+A view into a real OpenTTD game. Drag map around with mouse like on e.g. google maps. View updates every two seconds when standing still, as well as when you finish dragging. Join the OpenTTD server at myottd.net:8118.
+                </p>
+                <p>
+Note: Code was mostly written at three in the morning.
+                </p>
             </div>
         </div>
 
