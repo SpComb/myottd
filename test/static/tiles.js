@@ -16,6 +16,7 @@ function init (x, y, w, h, tw, th) {
     g_draggable = new Draggable("substrate", {
         starteffect: function () {}, 
         endeffect: function() {},
+        onDrag: viewport_drag_motion,
         onEnd: viewport_drag_end
     });
 
@@ -67,9 +68,15 @@ function load_tile (col, row) {
     mark_tile(col, row);
 }
 
-function check_tiles (x, y, w, h) {
+function check_tiles () {
+    var delta = g_draggable.currentDelta()
+    var x = -delta[0];
+    var y = -delta[1];
+    var w = g_w*g_tw;
+    var h = g_h*g_th;
+    
     var start_col = Math.floor(x/g_tw);
-    var start_row = Math.floor(y/g_tw);
+    var start_row = Math.floor(y/g_th);
     var end_col = Math.floor((x + w)/g_tw);
     var end_row = Math.floor((y + h)/g_th);
     
@@ -83,8 +90,18 @@ function check_tiles (x, y, w, h) {
     }
 }
 
+var g_drag_timeout;
+function viewport_drag_motion (d) {
+    if (g_drag_timeout)
+        clearTimeout(g_drag_timeout);
+
+    g_drag_timeout = setTimeout(check_tiles, 100);
+}
+
 function viewport_drag_end (d) {
-    delta = d.currentDelta()
-    check_tiles(-delta[0], -delta[1], g_w*g_tw, g_h*g_th);
+    if (g_drag_timeout)
+        clearTimeout(g_drag_timeout);
+
+    check_tiles();
 }
 

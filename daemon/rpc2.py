@@ -79,7 +79,7 @@ def _write_list (buf, items) :
 
 def _write_item (buf, arg) :
     if isinstance(arg, int) :
-        if arg > 0 :
+        if arg >= 0 :
             if arg < 2**8 :
                 type = 'B'
             elif arg < 2**16 :
@@ -89,7 +89,7 @@ def _write_item (buf, arg) :
             else :
                 raise ValueError("Integer %d is too large" % arg)
         else :
-            raise ValueError("Signed integers are not yet supported" % arg)
+            raise ValueError("Signed integers like %s are not yet supported" % arg)
 
         buf.write(type)   
         buf.writeStruct(type, arg)
@@ -143,6 +143,8 @@ def _read_list (i) :
 def _read_item (i) : 
     type = i.readAll(1)
 
+#    print "Read type %r" % type
+
     if type == 'x' :
         value = bool(i.readStruct('B'))
 
@@ -151,6 +153,8 @@ def _read_item (i) :
 
     elif type == 'S' :
         strType = i.readAll(1)
+
+#        print "Str type %r" % strType
 
         value = i.readVarLen(strType)
 

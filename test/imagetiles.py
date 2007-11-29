@@ -91,8 +91,33 @@ def load_image (filename) :
 
     return rows
 
+class OpenttdImage (resource.Resource) :
+    def __init__ (self, openttd) :
+        self.openttd = openttd
+
+    def render (self, r) :
+        x = int(r.args['x'][0])
+        y = int(r.args['y'][0])
+        w = int(r.args['w'][0])
+        h = int(r.args['h'][0])
+        z = int(r.args['z'][0])
+
+        d = self.openttd.getScreenshot(x, y, w, h, z)
+
+        d.addCallback(self._respond)
+
+        return d
+
+    def _respond (self, image_data) :
+        return http.Response(
+            responsecode.OK,
+            {
+                'Content-Type': http_headers.MimeType('image', 'png')
+            },
+            stream.MemoryStream(image_data)
+        )
+
 class Tile (resource.Resource) :
-    
     def __init__ (self, tiles) :
         self.tiles = tiles
 
@@ -121,22 +146,6 @@ class Root (resource.Resource) :
         
         tile_w, tile_h = TILE_SIZE
         
-#        # header
-#        table = "<tr>\n\t<th>&nbsp;</th>"
-#        for x, col in enumerate(xrange(start_col, end_col)) :
-#            table += """\n\t<th id="col_%d">%d</th>""" % (x, col)
-#        table += "\n</tr>"
-#        for y, row in enumerate(xrange(start_row, end_row)) :
-#            table += """<tr>\n\t<th id="row_%d">%d</th>""" % (y, row)
-#            for x, col in enumerate(xrange(start_col, end_col)) :
-#                table += """\n\t<td><img src="/tile_img?x=%d&y=%d" id="tile_%d_%d" /></td>""" % (col, row, x, y)
-#            table += """\n</tr>"""
-        
-        images = []
-#        for y, row in enumerate(xrange(start_row, end_row)) :
-#            for x, col in enumerate(xrange(start_col, end_col)) :
-#                images.append("""<img src="/tile_img?x=%d&y=%d" id="tile_%d_%d" style="top: %dpx; left:%dpx;"/>""" % (col, row, x, y, y*tile_h, x*tile_w))
-
         return http.Response(stream="""
 <html>
     <head>
@@ -159,11 +168,18 @@ class Root (resource.Resource) :
     </body>
 </html>""" % (view_w*tile_w, view_h*tile_h, '\n'.join(images), start_col, start_row, view_w, view_h, tile_w, tile_h))
 
-filename = "image.png"
-tiles = load_image(filename)
-
 root = Root()
-root.putChild("tile_img", Tile(tiles))
+
+
+# tile stuff
+filename = "image.png"
+#tiles = load_image(filename)
+#root.putChild("tile_img", Tile(tiles))
+
+# openttd stuff
+import openttd
+ottd = openttd.Openttd()
+root.putChild("openttd_img", OpenttdImage(ottd))
 root.putChild("static", static.File("static/"))
 
 site = server.Site(root)

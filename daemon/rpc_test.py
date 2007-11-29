@@ -10,7 +10,7 @@ def main () :
     global openttd, player_joined
 
     openttd = subprocess.Popen(
-        args=['/home/terom/my_ottd/openttd/trunk/bin/openttd', '-A', '-D', '192.168.11.11:5484'],
+        args=['/home/terom/my_ottd/openttd/trunk/bin/openttd', '-A', '-D', '0.0.0.0:8118'],
         bufsize=0,
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
@@ -49,12 +49,14 @@ IN_COMMANDS = [x.strip() for x in """
     CMD_IN_DEBUG,
     CMD_IN_NETWORK_EVENT,
     CMD_IN_PLAYERS_REPLY,
+    CMD_IN_SCREENSHOT_REPLY
 """.strip().split(',\n')]
 
 OUT_COMMANDS = [x.strip() for x in """
     CMD_OUT_NULL,
     CMD_OUT_CONSOLE_EXEC,
-    CMD_OUT_PLAYERS
+    CMD_OUT_PLAYERS,
+    CMD_OUT_SCREENSHOT
 """.strip().split(',\n')]
 
 NETWORK_EVENTS = [x.strip() for x in """
@@ -65,7 +67,7 @@ NETWORK_EVENTS = [x.strip() for x in """
 	NETWORK_ACTION_CHAT_COMPANY,
 	NETWORK_ACTION_CHAT_CLIENT,
 	NETWORK_ACTION_GIVE_MONEY,
-	NETWORK_ACTION_NAME_CHANGE,
+	NETWORK_ACTION_NAME_CHANGE
 """.strip().split(',\n')]    
 
 def readCommand (i) :
