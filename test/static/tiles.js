@@ -1,14 +1,15 @@
-var g_x, g_y, g_w, g_h, g_tw, g_th, g_draggable, g_loaded, g_debug, g_debug_enabled;
+var g_x, g_y, g_w, g_h, g_tw, g_th, g_draggable, g_loaded, g_debug, g_debug_enabled, g_z;
 
 var viewp, subs;
 
-function init (x, y, w, h, tw, th) {
+function init (x, y, w, h, tw, th, z) {
     g_x = x;
     g_y = y;
     g_w = w;
     g_h = h;
     g_tw = tw;
     g_th = th;
+    g_z = z;
 
     if (document.baseURI.indexOf("#") >= 0) {
         target = document.baseURI.split("#", 2);
@@ -62,9 +63,17 @@ function mark_tile (col, row) {
     g_loaded[col][row] = true;
 }
 
+function zoom (delta) {
+    g_z += delta;
+}
+
+function build_url (col, row) {
+    return "/openttd_img?x=" + ((g_x + col)*g_tw) + "&y=" + ((g_y + row)*g_th) + "&w=" + g_tw + "&h=" + g_th + "&z=" + g_z + "&ts=" + new Date().getTime();
+}
+
 function load_tile (col, row) {
     e = document.createElement("img");
-    e.src = "/openttd_img?x=" + ((g_x + col)*g_tw) + "&y=" + ((g_y + row)*g_th) + "&w=" + g_tw + "&h=" + g_th + "&z=0";
+    e.src = build_url(col, row);
     e.id = "tile_" + col + "_" + row;
     e.title = "(" + col + ", " + row + ")"
     e.style.top = g_th * row;
@@ -75,8 +84,9 @@ function load_tile (col, row) {
     mark_tile(col, row);
 }
 
+
 function touch_tile (col, row) {
-    $("tile_" + col + "_" + row).src = "/openttd_img?x=" + ((g_x + col)*g_tw) + "&y=" + ((g_y + row)*g_th) + "&w=" + g_tw + "&h=" + g_th + "&z=0&ts=" + new Date().getTime();
+    $("tile_" + col + "_" + row).src = build_url(col, row);
 }
 
 function check_tiles () {
@@ -90,7 +100,7 @@ function check_tiles () {
     var start_row = Math.floor(y/g_th);
     var end_col = Math.floor((x + w)/g_tw);
     var end_row = Math.floor((y + h)/g_th);
-    
+
     debug("Visible area: (" + x + ", " + y + ") -> (" + (x+w) + ", " + (y+h) + "), visible tiles: (" + start_col + ", " + start_row + ") -> (" + end_col + ", " + end_row + ")");
 
     for (col = start_col; col <= end_col; col++) {
@@ -102,6 +112,7 @@ function check_tiles () {
         }
     }
 
+    // don't set the timeout now, it's set in tile_loaded
     if (g_idle)
         g_timeout = setTimeout(check_tiles, 2000);
 }

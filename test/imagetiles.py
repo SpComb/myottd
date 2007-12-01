@@ -8,6 +8,7 @@ import os, os.path
 TILE_SIZE = (150, 150)
 VIEW_SIZE = (5, 3)
 START_POS = (25, 25)
+INITIAL_ZOOM = 0
 
 def load_cache (filename) :
     fh = open(filename, 'r')
@@ -91,32 +92,6 @@ def load_image (filename) :
 
     return rows
 
-class OpenttdImage (resource.Resource) :
-    def __init__ (self, openttd) :
-        self.openttd = openttd
-
-    def render (self, r) :
-        x = int(r.args['x'][0])
-        y = int(r.args['y'][0])
-        w = int(r.args['w'][0])
-        h = int(r.args['h'][0])
-        z = int(r.args['z'][0])
-
-        d = self.openttd.getScreenshot(x, y, w, h, z)
-
-        d.addCallback(self._respond)
-
-        return d
-
-    def _respond (self, image_data) :
-        return http.Response(
-            responsecode.OK,
-            {
-                'Content-Type': http_headers.MimeType('image', 'png')
-            },
-            stream.MemoryStream(image_data)
-        )
-
 class Tile (resource.Resource) :
     def __init__ (self, tiles) :
         self.tiles = tiles
@@ -149,13 +124,13 @@ class Root (resource.Resource) :
         images = []
         
         return http.Response(stream="""
-<html>
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en">
     <head>
         <title>Image tiles</title>
         <script src="/static/prototype.js" type="text/javascript"></script>
         <script src="/static/scriptaculous.js" type="text/javascript"></script>
         <script src="/static/tiles.js" type="text/javascript"></script>
-        <link rel="Stylesheet" type="text/css" href="static/style.css" />
+        <link rel="Stylesheet" type="text/css" href="static/style.css">
     </head>
     <body>
         <div id="wrapper">
@@ -165,9 +140,16 @@ class Root (resource.Resource) :
                 </div>
             </div>
 
+            <div id="zoom">
+                <button onclick="zoom(-1);">In</button> &lt;-- zoom --&gt; <button onclick="zoom(1)">Out</button>
+            </div>
+
             <div id="help">
                 <p>
 A view into a real OpenTTD game. Drag map around with mouse like on e.g. google maps. View updates every two seconds when standing still, as well as when you finish dragging. Join the OpenTTD server at myottd.net:8118.
+                </p>
+                <p>
+<strong>Zoom:</strong> Zooming in/out will not update your co-ordinates, and thence you will be looking at a different place after zooming. Scroll to the North-West shore of the map before zooming out, and the South-East shore before zooming in for optimal behaviour.
                 </p>
                 <p>
 Note: Code was mostly written at three in the morning.
@@ -175,9 +157,9 @@ Note: Code was mostly written at three in the morning.
             </div>
         </div>
 
-        <script type="text/javascript">init(%d, %d, %d, %d, %d, %d);</script>
+        <script type="text/javascript">init(%d, %d, %d, %d, %d, %d, %d);</script>
     </body>
-</html>""" % (view_w*tile_w, view_h*tile_h, '\n'.join(images), start_col, start_row, view_w, view_h, tile_w, tile_h))
+</html>""" % (view_w*tile_w, view_h*tile_h, '\n'.join(images), start_col, start_row, view_w, view_h, tile_w, tile_h, INITIAL_ZOOM))
 
 root = Root()
 
@@ -190,7 +172,7 @@ filename = "image.png"
 # openttd stuff
 import openttd
 ottd = openttd.Openttd()
-root.putChild("openttd_img", OpenttdImage(ottd))
+root.putChild("openttd_img", openttd.OpenttdImage(ottd))
 root.putChild("static", static.File("static/"))
 
 site = server.Site(root)

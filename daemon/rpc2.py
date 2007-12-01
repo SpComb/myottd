@@ -1,25 +1,20 @@
-from twisted.internet import protocol
+from twisted.internet import protocol, defer
 
-class RPCProtocol (protocol.Protocol) :
-    RECV_COMMANDS = SEND_COMMANDS = [
-        'call',
-        'return',
-        'error',
-    ]
+import buffer
 
-    METHODS = [
-
-    ]
+class RPCProtocol (buffer.BufferProtocol, protocol.Protocol, object) :
+    # what command to use for sending errors
+    ERROR_COMMAND = None
 
     def __init__ (self) :
+        super(RPCProtocol, self).__init__()
+
         self.calls = []
 
-
-    def do_call (self, method, *args) :
-        o = self.startCommand('call')
+    def invoke (self, method, *args) :
+        o = self.startCommand(method)
         
-        o.writeEnum(self.METHODS, method)
-        self._write_list(o, args)
+        writeMany(o, args)
 
         self.send(o)
 
@@ -28,56 +23,40 @@ class RPCProtocol (protocol.Protocol) :
         self.calls.append(d)
 
         return d
+    
+    def processCommand (self, buf) :
+        method = buf.readEnum(self.RECV_COMMANDS)
 
-    def on_call (self, i) :
-        method = i.readEnum(self.METHODS)
+        args = readMany(buf)
         
-        args = self._read_list(i)
+        ret = None
 
-        func = getattr(self, "rpc_%s" % method)
-        
         try :
-            func(*args)
+            ret = getattr(self, "rpc_%s" % method)(*args)
         except Exception, e :
-            self.do_error(e)
+            self.error(e)
             raise
 
         if isinstance(ret, defer.Deferred) :
-            ret.addCallback(self.do_return).addErrback(self.do_error)
-        else :
-            self.do_return(ret)
-            
-    def do_return (self, value) :
-        o = self.startCommand('return')
+            ret.addErrback(self.error)
 
-        self._write_item(o, value)
-
-        self.send(o)
-
-    def do_error (self, error) :
-        o = self.startCommand('error')
+    def error (self, error) :
+        o = self.startCommand(self.ERROR_COMMAND)
 
         self._write_item(o, str(error))
 
         self.send(o)
 
-    def on_return (self, i) :
-        value = self._read_item(i)
+    def _popCall (self) :
+        return self.calls.pop(0)
 
-        self.calls.pop(0).callback(value)
-    
-    def on_error (self, i) :
-        value = self._read_item(i)
-
-        self.calls.pop(0).errback(value)
-
-def _write_list (buf, items) :
+def writeMany (buf, items) :
     buf.writeStruct('B', len(items))
 
     for item in items :
-        _write_item(buf, item)
+        writeItem(buf, item)
 
-def _write_item (buf, arg) :
+def writeItem (buf, arg) :
     if isinstance(arg, int) :
         if arg >= 0 :
             if arg < 2**8 :
@@ -116,7 +95,7 @@ def _write_item (buf, arg) :
             arg = arg.iteritems()
 
         buf.write("X")
-        _write_list(buf, arg)
+        writeMany(buf, arg)
     
     elif isinstance(arg, bool) :
         buf.write("x")
@@ -128,20 +107,20 @@ def _write_item (buf, arg) :
     else :
         raise ValueError("Don't know how to handle argument of type %s" % type(arg))
 
-def _read_list (i) :
+def readMany (i) :
     num_args, = i.readStruct('B')
 
     args = []
 
     for x in xrange(num_args) :
-        item = _read_item(i)
+        item = readItem(i)
 
         args.append(item)
     
     return args
 
-def _read_item (i) : 
-    type = i.readAll(1)
+def readItem (i) : 
+    type = i.read(1)
 
 #    print "Read type %r" % type
 
@@ -149,10 +128,10 @@ def _read_item (i) :
         value = bool(i.readStruct('B'))
 
     elif type == 'X' :
-        value = _read_list(i)
+        value = readMany(i)
 
     elif type == 'S' :
-        strType = i.readAll(1)
+        strType = i.read(1)
 
 #        print "Str type %r" % strType
 
@@ -167,7 +146,7 @@ def _read_item (i) :
         
         while True :
             try :
-                value.append(_read_item(i))
+                value.append(readItem(i))
             except StopIteration :
                 break
     
@@ -175,10 +154,10 @@ def _read_item (i) :
         raise StopIteration()
 
     elif type == '!' :
-        raise Exception(_read_item(i))
+        raise Exception(readItem(i))
 
     else :
-        value, = i.readStruct(type)
+        value = i.readItem(type)
     
     return value
 

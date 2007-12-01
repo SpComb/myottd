@@ -31,9 +31,13 @@ table {
     position: absolute;
 }
 
-#help {
+#help, #zoom {
     width: 50%;
     margin: 20px auto;
+}
+
+#zoom {
+    text-align: center;
 }
 
 th {
