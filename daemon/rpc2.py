@@ -174,6 +174,9 @@ def _read_item (i) :
     elif type == ')' :
         raise StopIteration()
 
+    elif type == '!' :
+        raise Exception(_read_item(i))
+
     else :
         value, = i.readStruct(type)
     

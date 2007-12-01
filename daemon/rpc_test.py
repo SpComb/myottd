@@ -49,7 +49,8 @@ IN_COMMANDS = [x.strip() for x in """
     CMD_IN_DEBUG,
     CMD_IN_NETWORK_EVENT,
     CMD_IN_PLAYERS_REPLY,
-    CMD_IN_SCREENSHOT_REPLY
+    CMD_IN_SCREENSHOT_REPLY,
+    CMD_IN_ERROR_REPLY
 """.strip().split(',\n')]
 
 OUT_COMMANDS = [x.strip() for x in """
