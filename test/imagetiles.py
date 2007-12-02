@@ -151,10 +151,9 @@ A view into a real OpenTTD game. Drag map around with mouse like on e.g. google 
                 <p>
 <strong>Zoom:</strong> Zooming in/out will not update your co-ordinates, and thence you will be looking at a different place after zooming. Scroll to the North-West shore of the map before zooming out, and the South-East shore before zooming in for optimal behaviour.
                 </p>
-                <p>
-Note: Code was mostly written at three in the morning.
-                </p>
             </div>
+
+            <table id="vehicles_list"></table>
         </div>
 
         <script type="text/javascript">init(%d, %d, %d, %d, %d, %d, %d);</script>
@@ -172,7 +171,8 @@ filename = "image.png"
 # openttd stuff
 import openttd
 ottd = openttd.Openttd()
-root.putChild("openttd_img", openttd.OpenttdImage(ottd))
+root.putChild("tile", openttd.Tile(ottd))
+root.putChild("vehicles", openttd.Vehicles(ottd))
 root.putChild("static", static.File("static/"))
 
 site = server.Site(root)

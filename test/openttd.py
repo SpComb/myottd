@@ -5,6 +5,8 @@ import rpc2
 import rpc_test
 import buffer
 
+import simplejson
+
 class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
     RECV_COMMANDS = [x.strip() for x in """
         CMD_IN_NULL,
@@ -15,14 +17,17 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         CMD_IN_NETWORK_EVENT,
         CMD_IN_PLAYERS_REPLY,
         CMD_IN_SCREENSHOT_REPLY,
-        CMD_IN_ERROR_REPLY
-    """.strip().split(',\n')]
+        CMD_IN_ERROR_REPLY,
+        CMD_IN_VEHICLES_REPLY
+    """.strip("\n\t ,").split(',\n')]
 
     SEND_COMMANDS = [x.strip() for x in """
         CMD_OUT_NULL,
         CMD_OUT_CONSOLE_EXEC,
         CMD_OUT_PLAYERS,
-        CMD_OUT_SCREENSHOT
+        CMD_OUT_SCREENSHOT,
+        CMD_OUT_VEHICLE_SCREENSHOT,
+        CMD_OUT_VEHICLES
     """.strip().split(',\n')]
 
     NETWORK_EVENTS = [x.strip() for x in """
@@ -35,6 +40,15 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         NETWORK_ACTION_GIVE_MONEY,
         NETWORK_ACTION_NAME_CHANGE
     """.strip().split(',\n')]    
+    
+    VEHICLE_TYPES = [x.strip() for x in """
+        VEH_TRAIN,
+        VEH_ROAD,
+        VEH_SHIP,
+        VEH_AIRCRAFT,
+        VEH_SPECIAL,
+        VEH_DISASTER,
+    """.strip().split(',\n')]    
 
     def __init__ (self) :
         super(Openttd, self).__init__()
@@ -42,7 +56,7 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         self._screenshot_deferred = None
         self.reqs = []
         
-        args=['openttd', '-A', '-D', '192.168.11.11:8118', '-b', '8bpp-simple']
+        args=['openttd', '-A', '-D', '192.168.11.11:7199', '-b', '8bpp-simple']
         reactor.spawnProcess(self, '/home/terom/my_ottd/openttd/trunk/bin/openttd', args=args, path='/home/terom/my_ottd/openttd/trunk/bin/', usePTY=False)
 
     def connectionMade (self) :
@@ -70,11 +84,11 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
             try :
                 ret = func(*args)
             except Exception, e :
-                self.error(e)
+#                self.error(e)
                 raise
 
-            if isinstance(ret, defer.Deferred) :
-                ret.addErrback(self.error)
+#            if isinstance(ret, defer.Deferred) :
+#                ret.addErrback(self.error)
         else :
             print "Read %s:" % method
 
@@ -86,6 +100,14 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
     def getScreenshot (self, x, y, width, height, zoom) :
         log.msg("%dx%d screenshot at (%d, %d), zoom level %d" % (width, height, x, y, zoom))
         return self.invoke("CMD_OUT_SCREENSHOT", x, y, width, height, zoom)
+
+    def getVehicleScreenshot (self, veh_id, width, height, zoom) :
+        log.msg("%dx%d screenshot of vehicle %d, zoom level %d" % (width, height, veh_id, zoom))
+        return self.invoke("CMD_OUT_VEHICLE_SCREENSHOT", veh_id, width, height, zoom)
+
+    def getVehicleList (self) :
+        log.msg("fetch vehicle list")
+        return self.invoke("CMD_OUT_VEHICLES")
         
     def rpc_CMD_IN_SCREENSHOT_REPLY (self, chunks) :
         self._popCall().callback(''.join(chunks))
@@ -93,20 +115,30 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
     def rpc_CMD_IN_ERROR_REPLY (self, msg) :
         self._popCall().errback(msg)
 
+    def rpc_CMD_IN_VEHICLES_REPLY (self, vehicles) :
+        self._popCall().callback([(id, self.VEHICLE_TYPES[type]) for (id, type) in vehicles])
+
 from twisted.web2 import http_headers, http, stream, responsecode, resource
 
-class OpenttdImage (resource.Resource) :
+class Tile (resource.Resource) :
     def __init__ (self, openttd) :
         self.openttd = openttd
 
     def render (self, r) :
-        x = int(r.args['x'][0])
-        y = int(r.args['y'][0])
         w = int(r.args['w'][0])
         h = int(r.args['h'][0])
         z = int(r.args['z'][0])
 
-        d = self.openttd.getScreenshot(x, y, w, h, z)
+        if 'v' in r.args :
+            v = int(r.args['v'][0])
+
+            d = self.openttd.getVehicleScreenshot(v, w, h, z)
+
+        else :
+            x = int(r.args['x'][0])
+            y = int(r.args['y'][0])
+
+            d = self.openttd.getScreenshot(x, y, w, h, z)
 
         d.addCallback(self._respond)
 
@@ -124,4 +156,33 @@ class OpenttdImage (resource.Resource) :
             },
             stream.MemoryStream(image_data)
         )
+
+class Vehicles (resource.Resource) :
+    def __init__ (self, openttd) :
+        self.openttd = openttd
+
+    def render (self, r) :
+        d = self.openttd.getVehicleList()
+
+        d.addCallback(self._respond)
+
+        return d
+
+    def _respond (self, vehicles) :
+        json = simplejson.dumps(vehicles)
+        r = http.Response(
+            responsecode.OK,
+            {
+                'Content-Type': http_headers.MimeType('text', 'javascript'),
+
+                # Not cacheable
+                'Cache-Control': {'no-store': None},
+                'Expires': 100,
+            },
+            stream.MemoryStream(json)
+        )
+        
+        r.headers.addRawHeader('X-JSON', json)
+        
+        return r
 

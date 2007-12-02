@@ -45,6 +45,8 @@ function init (x, y, w, h, tw, th, z) {
 
         $('wrapper').appendChild(g_debug);
     }
+
+    vehicles_list();
 }
 
 function debug (str) {
@@ -68,7 +70,7 @@ function zoom (delta) {
 }
 
 function build_url (col, row) {
-    return "/openttd_img?x=" + ((g_x + col)*g_tw) + "&y=" + ((g_y + row)*g_th) + "&w=" + g_tw + "&h=" + g_th + "&z=" + g_z + "&ts=" + new Date().getTime();
+    return "/tile?x=" + ((g_x + col)*g_tw) + "&y=" + ((g_y + row)*g_th) + "&w=" + g_tw + "&h=" + g_th + "&z=" + g_z + "&ts=" + new Date().getTime();
 }
 
 function load_tile (col, row) {
@@ -134,5 +136,53 @@ function viewport_drag_end (d) {
         clearTimeout(g_timeout);
 
     check_tiles();
+}
+
+var g_vehicle_images = [];
+function vehicles_list () {
+    $('vehicles_list').innerHTML = "";
+    
+    new Ajax.Request("/vehicles", {
+        method: 'get',
+        onSuccess: function (transport, vehicles) {
+            vehicles.each(function(v){
+                var id = v[0];
+                var type = v[1];
+
+                var row = document.createElement("tr");
+
+                var header = document.createElement("th");
+                var link = document.createElement("a");
+                link.href = "/tile?v=" + id + "&w=300&h=150&z=" + g_z;
+                link.innerHTML = id;
+                header.appendChild(link);
+                row.appendChild(header);
+                
+                var type_cell = document.createElement("td");
+                type_cell.innerHTML = type;
+                row.appendChild(type_cell);
+
+                var img_cell = document.createElement("td");
+                var img = document.createElement("img");
+                img_cell.appendChild(img);
+                row.appendChild(img_cell);
+
+                g_vehicle_images[id] = img;
+
+                $('vehicles_list').appendChild(row);
+            });
+        }
+    }); 
+
+    update_vehicle_list();
+}
+
+function update_vehicle_list () {
+    for (var id = 0; id < g_vehicle_images.length; id++) {
+        if (g_vehicle_images[id])
+            g_vehicle_images[id].src = "/tile?v=" + id + "&w=300&h=150&z=" + g_z + "&ts=" + new Date().getTime();
+    }
+
+    setTimeout(update_vehicle_list, 2500);
 }
 
