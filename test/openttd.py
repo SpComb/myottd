@@ -6,6 +6,7 @@ import rpc_test
 import buffer
 
 import simplejson
+#import imagetiles
 
 class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
     RECV_COMMANDS = [x.strip() for x in """
@@ -27,7 +28,8 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         CMD_OUT_PLAYERS,
         CMD_OUT_SCREENSHOT,
         CMD_OUT_VEHICLE_SCREENSHOT,
-        CMD_OUT_VEHICLES
+        CMD_OUT_VEHICLES,
+        CMD_OUT_VEHICLE_SPRITE
     """.strip().split(',\n')]
 
     NETWORK_EVENTS = [x.strip() for x in """
@@ -108,6 +110,10 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
     def getVehicleList (self) :
         log.msg("fetch vehicle list")
         return self.invoke("CMD_OUT_VEHICLES")
+
+    def getVehicleSprite (self, veh_id) :
+        log.msg("fetch vehicle %d sprite" % veh_id)
+        return self.invoke("CMD_OUT_VEHICLE_SPRITE", veh_id)
         
     def rpc_CMD_IN_SCREENSHOT_REPLY (self, chunks) :
         self._popCall().callback(''.join(chunks))
@@ -125,20 +131,33 @@ class Tile (resource.Resource) :
         self.openttd = openttd
 
     def render (self, r) :
-        w = int(r.args['w'][0])
-        h = int(r.args['h'][0])
         z = int(r.args['z'][0])
+        
+        if 'r' in r.args and 'c' in r.args :
+            w, h = imagetiles.TILE_SIZE
 
-        if 'v' in r.args :
-            v = int(r.args['v'][0])
-
-            d = self.openttd.getVehicleScreenshot(v, w, h, z)
-
-        else :
-            x = int(r.args['x'][0])
-            y = int(r.args['y'][0])
+            r = int(r.args['r'][0])
+            c = int(r.args['c'][0])
+            
+            x = c * w
+            y = r * h
 
             d = self.openttd.getScreenshot(x, y, w, h, z)
+
+        else :
+            w = int(r.args['w'][0])
+            h = int(r.args['h'][0])
+
+            if 'v' in r.args :
+                v = int(r.args['v'][0])
+
+                d = self.openttd.getVehicleScreenshot(v, w, h, z)
+
+            else :
+                x = int(r.args['x'][0])
+                y = int(r.args['y'][0])
+
+                d = self.openttd.getScreenshot(x, y, w, h, z)
 
         d.addCallback(self._respond)
 
@@ -185,4 +204,36 @@ class Vehicles (resource.Resource) :
         r.headers.addRawHeader('X-JSON', json)
         
         return r
+
+class VehicleSprite (resource.Resource) :
+    def __init__ (self, openttd) :
+        self.openttd = openttd
+
+    def render (self, r) :
+        v = int(r.args['v'][0])
+
+        d = self.openttd.getVehicleSprite(v)
+
+        d.addCallback(self._respond)
+
+        return d
+
+    def _respond (self, image_data) :
+        return http.Response(
+            responsecode.OK,
+            {
+                'Content-Type': http_headers.MimeType('image', 'png'),
+
+                # Not cacheable
+                'Cache-Control': {'no-store': None},
+                'Expires': 100,
+            },
+            stream.MemoryStream(image_data)
+        )
+
+def startup (root) :
+    ottd = Openttd()
+    root.putChild("tile", Tile(ottd))
+    root.putChild("vehicles", Vehicles(ottd))
+    root.putChild("sprite", VehicleSprite(ottd))
 
