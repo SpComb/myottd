@@ -44,11 +44,20 @@ class Root (resource.Resource) :
                 <input type="button" id="zoom_in" onclick="zoom(-1)" value="In" /> 
                     &lt;-- zoom --&gt; 
                 <input type="button" id="zoom_out" onclick="zoom(1)" value="Out" />
+                <br/>
+
+                <a href="#" id="page_link">Link to this location</a>
             </div>
 
             <div id="help">
                 <p>
-A view into a real OpenTTD game. Drag map around with mouse like on e.g. google maps. View updates every two seconds when standing still, as well as when you finish dragging. Join the OpenTTD server at myottd.net:7199.
+A view into a real OpenTTD game. View updates when you drag the map. Join the OpenTTD server at <strong>myottd.net:7199</strong>.
+                </p>
+                <p>
+<strong>Moving around</strong>: You can drag the map around with the left mouse button held down, or alternatively double-click on the map to center on that location (complete with fancy scroll effect).
+                </p>
+                <p>
+<strong>Zooming</strong>. Use either the In/Out buttons, or the mouse wheel (scroll up to zoom in, scroll down to zoom out, this also centers the map on where the mouse is).
                 </p>
             </div>
 

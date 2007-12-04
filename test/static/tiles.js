@@ -52,25 +52,33 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     g_loaded = [];
     g_idle = true;
 
-    g_debug_enabled = true;
+    g_debug_enabled = false;
 
     viewp = $("viewport");
     subs = $("substrate");
     
+
     // were we anchored to some particular location?
     if (document.baseURI.indexOf("#") >= 0) {
         target = document.baseURI.split("#", 2);
-        asdf = target[1].split("_", 2);
+        asdf = target[1].split("_", 3);
+        
+        scroll_to(
+            parseInt(asdf[0]),
+            parseInt(asdf[1])
+        );
 
-        g_x = parseInt(asdf[0]);
-        g_y = parseInt(asdf[1]);
+        update_zoom_level(
+            parseInt(asdf[2])
+        );
+
+    } else {
+        // scroll to the initial position
+        scroll_to(g_x*g_tw, g_y*g_th);
+        
+        // adjust the zoom buttons
+        update_zoom_level(0);
     }
-
-    // adjust the zoom buttons
-    update_zoom_level(0);
-    
-    // scroll to the initial position
-    scroll_to(g_x*g_tw, g_y*g_th);
     
     // create the draggable
     g_draggable = new Draggable("substrate", {
@@ -84,10 +92,8 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     Event.observe(subs, "dblclick", viewport_dblclick);
 
     // mouse wheel
-    if (subs.addEventListener)
-        subs.addEventListener('DOMMouseScroll', viewport_mousewheel, false);
-
     Event.observe(subs, "mousewheel", viewport_mousewheel);
+    Event.observe(subs, "DOMMouseScroll", viewport_mousewheel);     // mozilla
 
     // should we do debugging?
     if (g_debug_enabled) {
@@ -178,7 +184,7 @@ function zoom (delta) {
  */
 function zoom_to (x, y, delta) {
     if (!update_zoom_level(delta))
-        return
+        return false;
 
     // scroll to a new position such that the center co-ordinate is correct
     scroll_to(
@@ -188,6 +194,8 @@ function zoom_to (x, y, delta) {
     
     // update view
     check_tiles();
+
+    return true;
 }
 
 /*
@@ -235,13 +243,16 @@ function viewport_mousewheel (e) {
     // delta < 0 : scroll down, zoom out
     delta = delta < 0 ? 1 : -1;
 
-    // where the mouse was
-    var offset = event_offset(e);
+    // Firefox's DOMMouseEvent's pageX/Y attributes are broken
+    var x = parseInt(e.target.style.left) + e.layerX;
+    var y = parseInt(e.target.style.top) + e.layerY;
+
+//    debug("scrollzoom to x=" + x + " y=" + y);
 
     zoom_to(
-        scroll_x() + offset.x,
-        scroll_y() + offset.y,
-        delta
+       x,
+       y,
+       delta
     );
 }
 
@@ -328,9 +339,8 @@ function touch_tile (col, row) {
  * If we are standing still, will schedule another call in two seconds
  */
 function check_tiles () {
-    var delta = g_draggable.currentDelta();
-    var x = -delta[0];
-    var y = -delta[1];
+    var x = scroll_x();
+    var y = scroll_y();
     var w = g_w*g_tw;
     var h = g_h*g_th;
     
@@ -339,7 +349,7 @@ function check_tiles () {
     var end_col = Math.floor((x + w)/g_tw);
     var end_row = Math.floor((y + h)/g_th);
 
-    debug("Visible area: (" + x + ", " + y + ") -> (" + (x+w) + ", " + (y+h) + "), visible tiles: (" + start_col + ", " + start_row + ") -> (" + end_col + ", " + end_row + ")");
+//    debug("Visible area: (" + x + ", " + y + ") -> (" + (x+w) + ", " + (y+h) + "), visible tiles: (" + start_col + ", " + start_row + ") -> (" + end_col + ", " + end_row + ")");
 
     for (col = start_col; col <= end_col; col++) {
         for (row = start_row; row <= end_row; row++) {
@@ -353,6 +363,9 @@ function check_tiles () {
     // don't set the timeout now, it's set in tile_loaded
 //    if (g_idle)
 //        g_timeout = setTimeout(check_tiles, 2000);
+
+    // update the link-to-this-page thing
+    $("page_link").href = "#" + x + "_" + y + "_" + g_z;
 }
 
 // viewport dragging stuff
