@@ -31,7 +31,7 @@ var viewp, subs;
 // the timeout used to call check_tiles
 var g_timeout;
 
-// a flag that signifies if we are scrolling (not idle) or not scrolling around (idle)
+// a flag that signifies if we have updated the map due to being idle (not moving for 100ms)
 var g_idle;
 
 // called with info about the viewport
@@ -52,7 +52,7 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     g_loaded = [];
     g_idle = true;
 
-    g_debug_enabled = false;
+    g_debug_enabled = true;
 
     viewp = $("viewport");
     subs = $("substrate");
@@ -82,10 +82,10 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     
     // create the draggable
     g_draggable = new Draggable("substrate", {
-        starteffect: function () {}, 
-        endeffect: function() {},
-        onDrag: viewport_drag_motion,
-        onEnd: viewport_drag_end
+        starteffect: null, 
+        endeffect: null,
+        onDrag: update_after_timeout,
+        onEnd: update_now
     });
 
     // double-click listener
@@ -193,7 +193,7 @@ function zoom_to (x, y, delta) {
     );
     
     // update view
-    check_tiles();
+    update_after_timeout();
 
     return true;
 }
@@ -247,13 +247,8 @@ function viewport_mousewheel (e) {
     var x = parseInt(e.target.style.left) + e.layerX;
     var y = parseInt(e.target.style.top) + e.layerY;
 
-//    debug("scrollzoom to x=" + x + " y=" + y);
-
-    zoom_to(
-       x,
-       y,
-       delta
-    );
+    if (zoom_to(x, y, delta))
+        debug("scrollzoom from x=" + x + " y=" + y);
 }
 
 /*
@@ -314,6 +309,9 @@ function build_url (col, row) {
  * Loads the given tile, assuming that it hasn't been loaded yet
  */
 function load_tile (col, row) {
+    if (col < 0 || row < 0)
+        return;
+
     e = document.createElement("img");
     e.src = build_url(col, row);
     e.id = "tile_" + col + "_" + row;
@@ -360,38 +358,39 @@ function check_tiles () {
         }
     }
 
-    // don't set the timeout now, it's set in tile_loaded
-//    if (g_idle)
-//        g_timeout = setTimeout(check_tiles, 2000);
-
     // update the link-to-this-page thing
     $("page_link").href = "#" + x + "_" + y + "_" + g_z;
 }
 
-// viewport dragging stuff
+// delayed updates
 
 /*
- * If we are still for more than 100ms, do check_tiles
+ * Call check_tiles in 100ms, unless we are called again
  */
-function viewport_drag_motion (d) {
+function update_after_timeout () {
     g_idle = false;
 
     if (g_timeout)
         clearTimeout(g_timeout);
 
-    g_timeout = setTimeout(check_tiles, 100);
+    g_timeout = setTimeout(_update_timeout, 100);  
+}
+
+function _update_timeout () {
+    g_idle = true;
+
+    check_tiles();
 }
 
 /*
- * We are now idle, also call check_tiles
+ * call check_tiles if it hasn't been called due to update_after_timeout
  */
-function viewport_drag_end (d) {
-    g_idle = true;
-
+function update_now () {
     if (g_timeout)
         clearTimeout(g_timeout);
-
-    check_tiles();
+    
+    if (!g_idle)
+        check_tiles();
 }
 
 // vehicles stuff
