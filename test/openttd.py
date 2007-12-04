@@ -52,6 +52,13 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         VEH_DISASTER,
     """.strip().split(',\n')]    
 
+    VEHICLE_TYPE_NAMES = [x.strip() for x in """
+        Train,
+        Road,
+        Ship,
+        Aircraft,
+    """.strip().split(',\n')]
+
     def __init__ (self) :
         super(Openttd, self).__init__()
 
@@ -122,7 +129,14 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         self._popCall().errback(msg)
 
     def rpc_CMD_IN_VEHICLES_REPLY (self, vehicles) :
-        self._popCall().callback([(id, self.VEHICLE_TYPES[type]) for (id, type) in vehicles])
+        self._popCall().callback([dict(
+            id      = id, 
+            type    = self.VEHICLE_TYPE_NAMES[type],
+            x       = x,
+            y       = y,
+            profit_this_year    = profit_this_year,
+            profit_last_year    = profit_last_year,
+        ) for (id, type, x, y, profit_this_year, profit_last_year) in vehicles])
 
 from twisted.web2 import http_headers, http, stream, responsecode, resource
 
@@ -189,6 +203,7 @@ class Vehicles (resource.Resource) :
 
     def _respond (self, vehicles) :
         json = simplejson.dumps(vehicles)
+
         r = http.Response(
             responsecode.OK,
             {

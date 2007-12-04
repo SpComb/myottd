@@ -43,3 +43,28 @@ table {
 th {
     padding: 2px;
 }
+
+table#vehicles_list {
+    background-color: #848484;
+    border: 1px solid #646464;
+
+    width: 500px;
+
+}
+table#vehicles_list tr {
+    cursor: pointer;
+}
+
+table#vehicles_list td,
+table#vehicles_list th {
+    border-top: 1px solid #949494;
+    border-bottom: 1px solid #747474;
+    padding: 2px;
+}
+
+table#vehicles_list {
+    font-size: x-small;
+    color: black;
+    text-decoration: none;
+}
+

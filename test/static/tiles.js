@@ -109,7 +109,7 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     check_tiles();
     
     // the list of vehicles
-    vehicles_list();
+    vehicle_list();
 }
 
 function debug (str) {
@@ -396,51 +396,66 @@ function viewport_drag_end (d) {
 
 // vehicles stuff
 
-var g_vehicle_images = [];
-function vehicles_list () {
-    $('vehicles_list').innerHTML = "";
-    
+var g_vehicles = new Array();
+function vehicle_list () {
     new Ajax.Request("/vehicles", {
         method: 'get',
         onSuccess: function (transport, vehicles) {
             vehicles.each(function(v){
-                var id = v[0];
-                var type = v[1];
+                if (g_vehicles[v.id]) {
+                    g_vehicles[v.id] = v;
+                    $("veh_" + v.id + "_sprite").src = "/sprite?v=" + v.id;
 
-                var row = document.createElement("tr");
+                } else {
+                    var row = document.createElement("tr");
+                        row.id = "veh_" + v.id;
 
-                var header = document.createElement("th");
-                var link = document.createElement("a");
-                link.href = "/tile?v=" + id + "&w=300&h=150&z=" + g_z;
-                link.innerHTML = id;
-                header.appendChild(link);
-                row.appendChild(header);
-                
-                var type_cell = document.createElement("td");
-                type_cell.innerHTML = type;
-                row.appendChild(type_cell);
+                    var left = document.createElement("td");
+                        left.innerHTML = v.id;
 
-                var img_cell = document.createElement("td");
-                var img = document.createElement("img");
-                img_cell.appendChild(img);
-                row.appendChild(img_cell);
+                        row.appendChild(left);
+                    
+                    var img_cell = document.createElement("td");
+                    var img = document.createElement("img");
+                    var descr = document.createElement("span");
+                        img.id = "veh_" + v.id + "_sprite";
+                        img.src = "/sprite?v=" + v.id;
 
-                g_vehicle_images[id] = img;
+                        descr.innerHTML = "PROFIT THIS YEAR: &pound;" + v.profit_this_year + " (LAST YEAR: &pound;" + v.profit_last_year + ")"
 
-                $('vehicles_list').appendChild(row);
-            });
+                        img_cell.appendChild(img);
+                        img_cell.appendChild(document.createElement("br"));
+                        img_cell.appendChild(descr);
+
+                        row.appendChild(img_cell);
+                        
+                    Event.observe(row, "click", function (e) {
+                        vehicle_scroll_to(v.id);
+                        e.stop();
+                        return false;
+                    });
+
+
+                    g_vehicles[v.id] = v;
+
+                    $('vehicles_list').appendChild(row);
+            }});
         }
     }); 
 
-    update_vehicle_list();
+    setTimeout(vehicle_list, 3000);
 }
 
-function update_vehicle_list () {
-    for (var id = 0; id < g_vehicle_images.length; id++) {
-        if (g_vehicle_images[id])
-            g_vehicle_images[id].src = "/tile?v=" + id + "&w=300&h=150&z=" + g_z + "&ts=" + new Date().getTime();
-    }
+/*
+ * scroll to a vehicle
+ */
+function vehicle_scroll_to (veh_id) {
+    var veh = g_vehicles[veh_id];
 
-    setTimeout(update_vehicle_list, 2500);
+    scroll_to(
+        veh.x - g_w_half,
+        veh.y - g_h_half
+    );
+
+    check_tiles();
 }
-

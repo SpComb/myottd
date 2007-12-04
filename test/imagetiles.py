@@ -61,7 +61,8 @@ A view into a real OpenTTD game. View updates when you drag the map. Join the Op
                 </p>
             </div>
 
-            <table id="vehicles_list"></table>
+            <table id="vehicles_list" cellspacing="0" cellpadding="0">
+            </table>
         </div>
 
         <script type="text/javascript">init(%d, %d, %d, %d, %d, %d, %d, %d, %d);</script>
