@@ -187,21 +187,33 @@ function align_center(offset, half, delta) {
  * change the zoom level. A positive value zooms out, a negative vlaue zooms in.
  */
 function zoom (delta) {
-    return zoom_to(scroll_x() + g_w_half, scroll_y() + g_h_half, delta);
+    return zoom_center_to(
+        scroll_x() + g_w_half,
+        scroll_y() + g_h_half, 
+        delta
+    );
 }
 
 /*
  * Zoom in/out such that the given co-ord (in current co-ord values) will be in the center of the screen
+ */
+function zoom_center_to (x, y, delta) {
+    return zoom_to(
+        scaleByZoomDelta(x, delta) - g_w_half,
+        scaleByZoomDelta(y, delta) - g_h_half,
+        delta
+     );
+}
+
+/*
+ * Zoom in/out such that the given co-ord (in target co-ord values) will be in the top-left corner
  */
 function zoom_to (x, y, delta) {
     if (!update_zoom_level(delta))
         return false;
 
     // scroll to a new position such that the center co-ordinate is correct
-    scroll_to(
-        scaleByZoomDelta(x, delta) - g_w_half,
-        scaleByZoomDelta(y, delta) - g_h_half
-    );
+    scroll_to(x, y);
     
     // update view
     update_after_timeout();
@@ -227,7 +239,13 @@ function event_offset (e) {
 function viewport_dblclick (e) {
     var offset = event_offset(e);
     
-    move(offset.x - g_w_half, offset.y - g_h_half);
+    zoom_center_to(
+        scroll_x() + offset.x,
+        scroll_y() + offset.y,
+        -1
+    );
+
+    // move(offset.x - g_w_half, offset.y - g_h_half);
 }
 
 // zoom control stuff
@@ -257,8 +275,15 @@ function viewport_mousewheel (e) {
     // Firefox's DOMMouseEvent's pageX/Y attributes are broken
     var x = parseInt(e.target.style.left) + e.layerX;
     var y = parseInt(e.target.style.top) + e.layerY;
+    var dx = x - scroll_x();
+    var dy = y - scroll_y();
 
-    zoom_to(x, y, delta)
+    zoom_to(
+        scaleByZoomDelta(x, delta) - dx, 
+        scaleByZoomDelta(y, delta) - dy, 
+        delta
+    );
+
 //  if ( )    
 //        debug("scrollzoom from x=" + x + " y=" + y);
 }
