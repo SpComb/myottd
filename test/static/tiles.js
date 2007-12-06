@@ -1,7 +1,7 @@
 // our initial (col, row) position
 var g_x, g_y;
 
-// how many tiles (wide, high) the viewport is
+// how many pixels (wide, high) the viewport is
 var g_w, g_h;
 
 // how (wide, high) a tile is
@@ -39,20 +39,21 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     // variable setup
     g_x = x;
     g_y = y;
-    g_w = w;
-    g_h = h;
+    g_w = w*tw;
+    g_h = h*th;
     g_tw = tw;
     g_th = th;
     g_z = z;
     g_z_min = z_min;
     g_z_max = z_max;
-    g_w_half = (g_w*g_tw)/2;
-    g_h_half = (g_h*g_th)/2;
+    g_w_half = g_w/2;
+    g_h_half = g_h/2;
     
     g_idle = true;
     g_tiles = [];
 
     g_debug_enabled = true;
+    fullscreen = false;
 
     viewp = $("viewport");
     subs = $("substrate");
@@ -71,18 +72,25 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     // were we anchored to some particular location?
     if (document.baseURI.indexOf("#") >= 0) {
         target = document.baseURI.split("#", 2);
-        asdf = target[1].split("_", 3);
+        target = target[1];
+    } else
+        target = "";
+        
+    if (target.indexOf("goto") == 0) {
+        asdf = target.split("_", 4);
+        
+        update_zoom_level(
+            parseInt(asdf[3]) - g_z
+        );
         
         scroll_to(
-            parseInt(asdf[0]),
-            parseInt(asdf[1])
-        );
-
-        update_zoom_level(
+            parseInt(asdf[1]),
             parseInt(asdf[2])
         );
-
     } else {
+        if (target == "fullscreen")
+            fullscreen = true;
+
         // scroll to the initial position
         scroll_to(g_x*g_tw, g_y*g_th);
         
@@ -115,9 +123,13 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
 
         $('wrapper').appendChild(g_debug);
     }
-    
-    // load the tiles and set off the update timer    
-    check_tiles();
+
+    if (fullscreen)
+        viewport_fullscreen();
+    else  {
+        // load the tiles and set off the update timer    
+        check_tiles();
+    }
     
     // the list of vehicles
     vehicle_list();
@@ -126,6 +138,36 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
 function debug (str) {
     if (g_debug_enabled)
         g_debug.textContent = (str + "\n") + g_debug.textContent;
+}
+
+// viewport-oriented stuff
+
+/*
+ * update the screen size stuff based on the actual viewport size
+ */
+function update_viewport_size () {
+    g_w = viewp.getWidth();
+    g_h = viewp.getHeight();
+
+    g_w_half = g_w/2;
+    g_h_half = g_h/2;
+
+    check_tiles();
+}
+
+function viewport_fullscreen () {
+    viewp.style.position = "absolute";
+    viewp.style.top = "0px";
+    viewp.style.left = "0px";
+//    viewp.style.bottom = "0px";
+//    viewp.style.right = "0px";
+    viewp.style.width = "100%";
+    viewp.style.height = "100%";
+    viewp.style.borderWidth = 0;
+
+    $("btn_fullscreen").hide();
+
+    update_viewport_size();
 }
 
 // pixel-oriented stuff, related to where the view is scrolled to
@@ -239,13 +281,15 @@ function event_offset (e) {
 function viewport_dblclick (e) {
     var offset = event_offset(e);
     
-    zoom_center_to(
+    if (!zoom_center_to(
         scroll_x() + offset.x,
         scroll_y() + offset.y,
         -1
-    );
+    )) {
+        // if we're already zoomed in, move o/
+        move(offset.x - g_w_half, offset.y - g_h_half);
+    }
 
-    // move(offset.x - g_w_half, offset.y - g_h_half);
 }
 
 // zoom control stuff
@@ -406,8 +450,8 @@ function touch_tile (tile, col, row) {
 function check_tiles () {
     var x = scroll_x();
     var y = scroll_y();
-    var w = g_w*g_tw;
-    var h = g_h*g_th;
+    var w = g_w;
+    var h = g_h;
     
     var start_col = Math.floor(x/g_tw);
     var start_row = Math.floor(y/g_th);
@@ -431,7 +475,7 @@ function check_tiles () {
     }
 
     // update the link-to-this-page thing
-    $("page_link").href = "#" + x + "_" + y + "_" + g_z;
+    $("page_link").href = "#goto_" + x + "_" + y + "_" + g_z;
 }
 
 // delayed updates
