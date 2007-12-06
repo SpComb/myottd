@@ -13,9 +13,6 @@ var g_w_half, g_h_half;
 // the Draggable substrate, we get our current offset from this
 var g_draggable;
 
-// a two-dimensional array of what tiles we have loaded, indexed by absolute [col][row]
-var g_loaded;
-
 // random debugging crap
 var g_debug, g_debug_enabled;
 
@@ -34,6 +31,9 @@ var g_timeout;
 // a flag that signifies if we have updated the map due to being idle (not moving for 100ms)
 var g_idle;
 
+// a list of tiles for each zoom level
+var g_tiles;
+
 // called with info about the viewport
 function init (x, y, w, h, tw, th, z, z_min, z_max) {
     // variable setup
@@ -49,14 +49,24 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     g_w_half = (g_w*g_tw)/2;
     g_h_half = (g_h*g_th)/2;
     
-    g_loaded = [];
     g_idle = true;
+    g_tiles = [];
 
     g_debug_enabled = true;
 
     viewp = $("viewport");
     subs = $("substrate");
-    
+
+    // create the zoom-level divs
+    for (var zl = z_min; zl <= z_max; zl++) {
+        zl_div = document.createElement("div");
+        zl_div.id = "zl_" + zl;
+        zl_div.style.position = "relative";
+
+        subs.appendChild(zl_div);
+
+        g_tiles[zl] = [];
+    }
 
     // were we anchored to some particular location?
     if (document.baseURI.indexOf("#") >= 0) {
@@ -84,8 +94,9 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     g_draggable = new Draggable("substrate", {
         starteffect: null, 
         endeffect: null,
-        onDrag: update_after_timeout,
-        onEnd: update_now
+        onStart: viewport_scroll_start,
+        onDrag: viewport_scroll_move,
+        onEnd: viewport_scroll_done
     });
 
     // double-click listener
@@ -247,8 +258,9 @@ function viewport_mousewheel (e) {
     var x = parseInt(e.target.style.left) + e.layerX;
     var y = parseInt(e.target.style.top) + e.layerY;
 
-    if (zoom_to(x, y, delta))
-        debug("scrollzoom from x=" + x + " y=" + y);
+    zoom_to(x, y, delta)
+//  if ( )    
+//        debug("scrollzoom from x=" + x + " y=" + y);
 }
 
 /*
@@ -256,13 +268,16 @@ function viewport_mousewheel (e) {
  * Disable/enable the zoom in/out buttons to reflect the current zoom level and the min/max zoom levels
  */
 function update_zoom_level (delta) {
+    var oz = g_z;
     var z = g_z + delta;
-
+    
+    // is the new zoom level valid?
     if (z < g_z_min || z > g_z_max)
         return false;
     
     g_z = z;
-
+    
+    // update the zoom buttons
     if (z == g_z_min)
         $("zoom_in").disable();
     else
@@ -272,28 +287,48 @@ function update_zoom_level (delta) {
         $("zoom_out").disable();
     else
         $("zoom_out").enable();
+    
+    // now update the zoomlevel div's z-indexes
+    var zi = 10;
+    var i;
+    
+    // preferr the zoomed-in levels over the zoomed-out levels
+    for (i = g_z_min; i < z; i++)
+        $("zl_" + i).style.zIndex = zi++;
+    
+    // haet the zoomed-out levels
+    for (i = g_z_max; i > z; i--)
+        $("zl_" + i).style.zIndex = zi++;
+    
+    // and these are obviously the best
+    $("zl_" + z).style.zIndex = zi;
+    
+    // now update the image sizes/positions
+    var dz, w, h, tiles, tiles_len, t, ts;
+    for (zi = g_z_min; zi <= g_z_max; zi++) {
+        dz = z - zi;
 
+        w = scaleByZoomDelta(g_tw, dz);
+        h = scaleByZoomDelta(g_th, dz);
+
+        tiles = g_tiles[zi];
+        tiles_len = tiles.length;
+
+        for (i = 0; i < tiles_len; i++) {
+            t = tiles[i];
+            ts = t.style;
+
+            ts.width = w;
+            ts.height = h;
+            ts.top = h*t.__row;
+            ts.left = w*t.__col;
+        }
+    }
+    
     return true;
 }
 
 // tile-oriented stuff
-
-/*
- * Has the given tile been loaded yet?
- */
-function is_loaded (col, row) {
-    return (g_loaded[col] && g_loaded[col][row]);
-}
-
-/*
- * Mark the given tile as haveing been loaded
- */
-function mark_tile (col, row) {
-    if (!g_loaded[col])
-        g_loaded[col] = [];
-
-    g_loaded[col][row] = true;
-}
 
 /*
  * Return the URL to the given tile, taking the current zoom level into account
@@ -308,27 +343,34 @@ function build_url (col, row) {
 /*
  * Loads the given tile, assuming that it hasn't been loaded yet
  */
-function load_tile (col, row) {
+function load_tile (id, col, row) {
     if (col < 0 || row < 0)
         return;
 
     e = document.createElement("img");
     e.src = build_url(col, row);
-    e.id = "tile_" + col + "_" + row;
+    e.id = id;
     e.title = "(" + col + ", " + row + ")"
     e.style.top = g_th * row;
     e.style.left = g_tw * col;
+    e.style.display = "none";
+    e.onload = _tile_loaded;
+    e.__col = col;
+    e.__row = row;
 
-    subs.appendChild(e);
+    $("zl_" + g_z).appendChild(e);
+    g_tiles[g_z].push(e);
+}
 
-    mark_tile(col, row);
+function _tile_loaded (t) {
+    t.currentTarget.style.display = null;
 }
 
 /*
  * Updates the tile to the current time/zoom level
  */
-function touch_tile (col, row) {
-    $("tile_" + col + "_" + row).src = build_url(col, row);
+function touch_tile (tile, col, row) {
+    tile.src = build_url(col, row);
 }
 
 /*
@@ -349,12 +391,17 @@ function check_tiles () {
 
 //    debug("Visible area: (" + x + ", " + y + ") -> (" + (x+w) + ", " + (y+h) + "), visible tiles: (" + start_col + ", " + start_row + ") -> (" + end_col + ", " + end_row + ")");
 
+    var id, t;
+
     for (col = start_col; col <= end_col; col++) {
         for (row = start_row; row <= end_row; row++) {
-            if (!is_loaded(col, row))
-                load_tile(col, row);
+            id = "tile_" + g_z + "_" + col + "_" + row;
+            t = $(id);
+
+            if (t)
+                touch_tile(t, col, row);
             else
-                touch_tile(col, row);
+                load_tile(id, col, row);
         }
     }
 
@@ -376,12 +423,18 @@ function update_after_timeout () {
     g_timeout = setTimeout(_update_timeout, 100);  
 }
 
+function update_timeout_cancel () {
+    if (g_timeout) {
+        debug("Cancel timeout");
+        clearTimeout(g_timeout);
+    }
+}
+
 function _update_timeout () {
     g_idle = true;
 
     check_tiles();
 }
-
 /*
  * call check_tiles if it hasn't been called due to update_after_timeout
  */
@@ -392,6 +445,41 @@ function update_now () {
     if (!g_idle)
         check_tiles();
 }
+
+// scrolling
+
+/*
+ * called on scroll start
+ */
+var g_scroll_x, g_scroll_y;
+function viewport_scroll_start () {
+    g_scroll_x = scroll_x();
+    g_scroll_y = scroll_y();
+}
+
+function viewport_scroll_move () {
+    update_after_timeout();
+
+    // may still want some kind of code like this later
+/*    
+    var x = scroll_x();
+    var y = scroll_y();
+
+    var dx = Math.abs(g_scroll_x - x);
+    var dy = Math.abs(g_scroll_y - y)
+
+    if (dx > 100 || dy > 100) {
+        debug("scrolled dx=" + dx + " dy=" + dy + " pixels, update in 100ms");
+
+        update_after_timeout();
+    }
+*/
+}
+
+function viewport_scroll_done() {
+    update_now();
+}
+
 
 // vehicles stuff
 

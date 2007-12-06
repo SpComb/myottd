@@ -3,10 +3,10 @@ from twisted.web2 import server, http, resource, channel, stream, responsecode, 
 from twisted.internet import reactor
 import os, os.path
 
-TILE_SIZE = (150, 150)
-VIEW_SIZE = (5, 3)
-START_POS = (25, 25)
-INITIAL_ZOOM = 0
+TILE_SIZE = (256, 256)
+VIEW_SIZE = (3, 2)
+START_POS = (10, 10)
+INITIAL_ZOOM = 1
 ZOOM_MIN = 0    # the closest level of zoom
 ZOOM_MAX = 3    # the furthest level of zoom
 
