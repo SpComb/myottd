@@ -57,6 +57,8 @@ class IReadStream (IStreamBase) :
         """
             Return the data part of a <length><data> structure.
             len_type indicates what type length has (struct format code).
+
+            In the case of <length> being zero, returns an empty string.
         """
         
         size = self.readItem(len_type)

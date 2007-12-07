@@ -153,6 +153,19 @@ def readItem (i) :
     elif type == ')' :
         raise StopIteration()
 
+    elif type == '@' :
+        chunks = []
+
+        while True :
+            chunk = i.readVarLen('B')
+
+            if chunk :
+                chunks.append(chunk)
+            else :
+                break
+        
+        value = ''.join(chunks)
+
     elif type == '!' :
         raise Exception(readItem(i))
 

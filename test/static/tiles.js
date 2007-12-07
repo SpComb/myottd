@@ -39,8 +39,8 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     // variable setup
     g_x = x;
     g_y = y;
-    g_w = w*tw;
-    g_h = h*th;
+    g_w = w;
+    g_h = h;
     g_tw = tw;
     g_th = th;
     g_z = z;
@@ -164,8 +164,6 @@ function viewport_fullscreen () {
     viewp.style.width = "100%";
     viewp.style.height = "100%";
     viewp.style.borderWidth = 0;
-
-    $("btn_fullscreen").hide();
 
     update_viewport_size();
 }
@@ -358,6 +356,7 @@ function update_zoom_level (delta) {
         $("zoom_out").enable();
     
     // now update the zoomlevel div's z-indexes
+    zoom_showhide_fillers(true);
     var zi = 10;
     var i;
     
@@ -395,6 +394,18 @@ function update_zoom_level (delta) {
     }
     
     return true;
+}
+
+/*
+ * Hide the filler layers, i.e. the ones that aren't the current zoom level
+ */
+function zoom_showhide_fillers (show) {
+    for (var zi = g_z_min; zi <= g_z_max; zi++)
+        if (zi != g_z)
+            if (show)
+                $("zl_" + zi).show();
+            else 
+                $("zl_" + zi).hide();
 }
 
 // tile-oriented stuff
@@ -530,6 +541,7 @@ function viewport_scroll_move () {
     update_after_timeout();
 
     // may still want some kind of code like this later
+    // possibly: update once we scroll over 100px, regardless of if we're still or not
 /*    
     var x = scroll_x();
     var y = scroll_y();

@@ -67,7 +67,7 @@ A view into a real OpenTTD game. View updates when you drag the map. Join the Op
 
         <script type="text/javascript">init(%d, %d, %d, %d, %d, %d, %d, %d, %d);</script>
     </body>
-</html>""" % (view_w*tile_w, view_h*tile_h, '\n'.join(images), start_col, start_row, view_w, view_h, tile_w, tile_h, INITIAL_ZOOM, ZOOM_MIN, ZOOM_MAX))
+</html>""" % (view_w*tile_w, view_h*tile_h, '\n'.join(images), start_col, start_row, view_w*tile_w, view_h*tile_h, tile_w, tile_h, INITIAL_ZOOM, ZOOM_MIN, ZOOM_MAX))
 
 root = Root()
 root.putChild("static", static.File("static/"))

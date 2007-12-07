@@ -8,7 +8,7 @@
         <div id='outer'>
             <div id='header'>
                 MyOTTD
-                <span style='font-size: xx-small; font-style: italic'>Like somewhat alpha</span>
+                <span style='font-size: xx-small; font-style: italic'>Like live alpha prerelease</span>
             </div>
             <div id='nav'>
                 <div id='nav_right'>
@@ -50,7 +50,7 @@
             </div>
             <div id='footer'>
                 <p><strong>MyOTTD</strong> is an OpenTTD dedicated server hosting service. You can create and manage an OpenTTD server from your web browser, and play on it like on any other OpenTTD server.<p>
-                <p>MyOTTD is currently very alpha, which means it lacks many of the essential features that would make it worth using, but the basic functionality should be there, and more is being added all the time. Log in or register to see how it works!</p>
+                <p>MyOTTD is currently in alpha phase and under development. The current code works somewhat but hasn't been touched for a while and has various issues. Work is under way on prototype code for a fairly extensive rewrite - preview some prototype features at <a href="http://dev.myottd.net:8119/">dev.myottd.net</a></p>
             </div>
         </div>
     </body>
