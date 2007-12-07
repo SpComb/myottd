@@ -35,24 +35,20 @@ var g_idle;
 var g_tiles;
 
 // called with info about the viewport
-function init (x, y, w, h, tw, th, z, z_min, z_max) {
+function init (x, y, tw, th, z, z_min, z_max) {
     // variable setup
     g_x = x;
     g_y = y;
-    g_w = w;
-    g_h = h;
     g_tw = tw;
     g_th = th;
     g_z = z;
     g_z_min = z_min;
     g_z_max = z_max;
-    g_w_half = g_w/2;
-    g_h_half = g_h/2;
     
     g_idle = true;
     g_tiles = [];
 
-    g_debug_enabled = true;
+    g_debug_enabled = false;
     fullscreen = false;
 
     viewp = $("viewport");
@@ -114,6 +110,9 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     Event.observe(subs, "mousewheel", viewport_mousewheel);
     Event.observe(subs, "DOMMouseScroll", viewport_mousewheel);     // mozilla
 
+    // window size changes
+    Event.observe(document, "resize", update_viewport_size);
+
     // should we do debugging?
     if (g_debug_enabled) {
         g_debug = document.createElement("pre");
@@ -127,8 +126,8 @@ function init (x, y, w, h, tw, th, z, z_min, z_max) {
     if (fullscreen)
         viewport_fullscreen();
     else  {
-        // load the tiles and set off the update timer    
-        check_tiles();
+        // load the viewport size and then the tiles
+        update_viewport_size();
     }
     
     // the list of vehicles
