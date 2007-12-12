@@ -8,8 +8,10 @@ import buffer
 import simplejson
 #import imagetiles
 
+def enum (data) : return [x.strip() for x in data.strip("\n\t ,").split(',\n')]
+
 class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
-    RECV_COMMANDS = [x.strip() for x in """
+    RECV_COMMANDS = enum("""
         CMD_IN_NULL,
         CMD_IN_CONSOLE,
         CMD_IN_WARNING,
@@ -19,20 +21,22 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         CMD_IN_PLAYERS_REPLY,
         CMD_IN_SCREENSHOT_REPLY,
         CMD_IN_ERROR_REPLY,
-        CMD_IN_VEHICLES_REPLY
-    """.strip("\n\t ,").split(',\n')]
+        CMD_IN_VEHICLES_REPLY,
+        CMD_IN_SAVELOAD_REPLY,
+    """)
 
-    SEND_COMMANDS = [x.strip() for x in """
+    SEND_COMMANDS = enum("""
         CMD_OUT_NULL,
         CMD_OUT_CONSOLE_EXEC,
         CMD_OUT_PLAYERS,
         CMD_OUT_SCREENSHOT,
         CMD_OUT_VEHICLE_SCREENSHOT,
         CMD_OUT_VEHICLES,
-        CMD_OUT_VEHICLE_SPRITE
-    """.strip().split(',\n')]
+        CMD_OUT_VEHICLE_SPRITE,
+        CMD_OUT_SAVELOAD,
+    """)
 
-    NETWORK_EVENTS = [x.strip() for x in """
+    NETWORK_EVENTS = enum("""
         NETWORK_ACTION_JOIN,
         NETWORK_ACTION_LEAVE,
         NETWORK_ACTION_SERVER_MESSAGE,
@@ -41,23 +45,29 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         NETWORK_ACTION_CHAT_CLIENT,
         NETWORK_ACTION_GIVE_MONEY,
         NETWORK_ACTION_NAME_CHANGE
-    """.strip().split(',\n')]    
+    """)
     
-    VEHICLE_TYPES = [x.strip() for x in """
+    VEHICLE_TYPES = enum("""
         VEH_TRAIN,
         VEH_ROAD,
         VEH_SHIP,
         VEH_AIRCRAFT,
         VEH_SPECIAL,
         VEH_DISASTER,
-    """.strip().split(',\n')]    
+    """)
 
-    VEHICLE_TYPE_NAMES = [x.strip() for x in """
+    VEHICLE_TYPE_NAMES = enum("""
         Train,
         Road,
         Ship,
         Aircraft,
-    """.strip().split(',\n')]
+    """)
+
+    SAVELOAD_MODE = enum("""
+
+    """)
+        
+
 
     def __init__ (self) :
         super(Openttd, self).__init__()
@@ -65,7 +75,7 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         self._screenshot_deferred = None
         self.reqs = []
         
-        args=['openttd', '-A', '-D', '192.168.11.11:7199', '-b', '8bpp-simple', '-g', 'sign.sav']
+        args=['openttd', '-A', '-D', '192.168.11.11:7199', '-b', '8bpp-simple']
         reactor.spawnProcess(self, '/home/terom/my_ottd/openttd/trunk/bin/openttd', args=args, path='/home/terom/my_ottd/openttd/trunk/bin/', usePTY=False)
 
     def connectionMade (self) :

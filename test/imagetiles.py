@@ -40,6 +40,7 @@ class Root (resource.Resource) :
                     initial_zoom        = INITIAL_ZOOM,
                     zoom_min            = ZOOM_MIN,
                     zoom_max            = ZOOM_MAX,
+                    mode                = mode.__name__,
             )
             response = responsecode.OK
         except :
@@ -60,7 +61,20 @@ site = server.Site(root)
 
 # direct HTTP
 chan = channel.HTTPFactory(site)
-port = 'tcp:8119'
+
+from sys import argv
+
+import openttd
+import image
+
+if 'mode_openttd.py' in argv :
+    mode = openttd
+    port = 'tcp:8119'
+elif 'mode_images.py' in argv :
+    mode = image
+    port = 'tcp:8118'
+else :
+    mode = None
 
 # FastCGI
 #chan = channel.FastCGIFactory(site)
@@ -71,12 +85,13 @@ application = service.Application("imagetiles")
 s = strports.service(port, chan)
 s.setServiceParent(application)
 
-import openttd
-
 def startup (mode) :
     log.msg("imagetiles.startup")
 
+    root.mode = mode
+
     mode.startup(root)
-    
-reactor.callWhenRunning(startup, openttd)
+
+
+reactor.callWhenRunning(startup, mode)
 

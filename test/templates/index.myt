@@ -23,13 +23,17 @@
 
             <div id="help">
                 <p>
+% if mode == "openttd" :                
 A view into a real OpenTTD game. View updates when you drag the map. Join the OpenTTD server at <strong>myottd.net:7199</strong>.
+% elif mode == "image" :
+A selection of large images that you can, like, scroll around. Use the dropdown below the viewport to select the image to view
+% endif
                 </p>
                 <p>
-<strong>Moving around</strong>: You can drag the map around with the left mouse button held down, or alternatively double-click on the map to center on that location (complete with fancy scroll effect).
+<strong>Moving around</strong>: Simply drag the map around with the left mouse button held down.
                 </p>
                 <p>
-<strong>Zooming</strong>. Use either the In/Out buttons, or the mouse wheel (scroll up to zoom in, scroll down to zoom out, this also centers the map on where the mouse is).
+<strong>Zooming</strong>. Either use the In/Out buttons, the mouse wheel (scroll up to zoom in, scroll down to zoom out), or double-click on the map.
                 </p>
             </div>
 
@@ -37,6 +41,16 @@ A view into a real OpenTTD game. View updates when you drag the map. Join the Op
             </table>
         </div>
 
-        <script type="text/javascript">init(${start_col}, ${start_row}, ${tile_width}, ${tile_height}, ${initial_zoom}, ${zoom_min}, ${zoom_max});</script>
+        <script type="text/javascript">
+            init();
+% if mode == "openttd" :        
+            load(${start_col}, ${start_row}, ${tile_width}, ${tile_height}, ${initial_zoom}, ${zoom_min}, ${zoom_max}, null, null, true);
+            vehicle_list();
+% elif mode == "image" :
+            load_image_list();
+% else :
+            <% raise ValueError(mode) %>
+% endif            
+        </script>
     </body>
 </html>

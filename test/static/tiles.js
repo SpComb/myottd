@@ -34,66 +34,24 @@ var g_idle;
 // a list of tiles for each zoom level
 var g_tiles;
 
-// called with info about the viewport
-function init (x, y, tw, th, z, z_min, z_max) {
-    // variable setup
-    g_x = x;
-    g_y = y;
-    g_tw = tw;
-    g_th = th;
-    g_z = z;
-    g_z_min = z_min;
-    g_z_max = z_max;
-    
-    g_idle = true;
-    g_tiles = [];
+// any target that we were given in the URL
+var g_target;
 
+// called with info about the viewport
+function init () {
     g_debug_enabled = false;
     fullscreen = false;
 
     viewp = $("viewport");
     subs = $("substrate");
 
-    // create the zoom-level divs
-    for (var zl = z_min; zl <= z_max; zl++) {
-        zl_div = document.createElement("div");
-        zl_div.id = "zl_" + zl;
-        zl_div.style.position = "relative";
-
-        subs.appendChild(zl_div);
-
-        g_tiles[zl] = [];
-    }
-
     // were we anchored to some particular location?
     if (document.baseURI.indexOf("#") >= 0) {
-        target = document.baseURI.split("#", 2);
-        target = target[1];
+        g_target = document.baseURI.split("#", 2);
+        g_target = g_target[1];
     } else
-        target = "";
-        
-    if (target.indexOf("goto") == 0) {
-        asdf = target.split("_", 4);
-        
-        update_zoom_level(
-            parseInt(asdf[3]) - g_z
-        );
-        
-        scroll_to(
-            parseInt(asdf[1]),
-            parseInt(asdf[2])
-        );
-    } else {
-        if (target == "fullscreen")
-            fullscreen = true;
-
-        // scroll to the initial position
-        scroll_to(g_x*g_tw, g_y*g_th);
-        
-        // adjust the zoom buttons
-        update_zoom_level(0);
-    }
-    
+        g_target = "";
+   
     // create the draggable
     g_draggable = new Draggable("substrate", {
         starteffect: null, 
@@ -122,17 +80,79 @@ function init (x, y, tw, th, z, z_min, z_max) {
 
         $('wrapper').appendChild(g_debug);
     }
+}
 
+/*
+ * Initialize this for viewing the given image parameters
+ */
+
+var g_opt_key, g_opt_value, g_refresh;
+function load (x, y, tw, th, z, z_min, z_max, opt_key, opt_value, refresh) {
+    // variable setup
+    g_x = x;
+    g_y = y;
+    g_tw = tw;
+    g_th = th;
+    g_z = z;
+    g_z_min = z_min;
+    g_z_max = z_max;
+    g_opt_key = opt_key;
+    g_opt_value = opt_value;
+    g_refresh = refresh;
+    
+    g_idle = true;
+
+    g_tiles = [];
+    
+    viewp = $("viewport");
+    subs = $("substrate");
+    
+    // create the zoom-level divs
+    for (var zl = z_min; zl <= z_max; zl++) {
+        zl_div = document.createElement("div");
+        zl_div.id = "zl_" + zl;
+        zl_div.style.position = "relative";
+
+        subs.appendChild(zl_div);
+
+        g_tiles[zl] = [];
+    }
+
+    if (g_target.indexOf("goto") == 0) {
+        asdf = g_target.split("_", 4);
+        
+        update_zoom_level(
+            parseInt(asdf[3]) - g_z
+        );
+        
+        scroll_to(
+            parseInt(asdf[1]),
+            parseInt(asdf[2])
+        );
+    } else {
+        if (g_target == "fullscreen")
+            fullscreen = true;
+
+        // scroll to the initial position
+        scroll_to(g_x*g_tw, g_y*g_th);
+        
+        // adjust the zoom buttons
+        update_zoom_level(0);
+    }
+    
     if (fullscreen)
         viewport_fullscreen();
     else  {
         // load the viewport size and then the tiles
         update_viewport_size();
     }
-    
-    // the list of vehicles
-    vehicle_list();
 }
+
+function unload () {
+    $("substrate").innerHTML = "";
+    g_tiles = [];
+}
+
 
 function debug (str) {
     if (g_debug_enabled)
@@ -416,7 +436,15 @@ function build_url (col, row) {
     var x = col*(g_tw << g_z);
     var y = row*(g_th << g_z);
 
-    return "/tile?x=" + x + "&y=" + y + "&w=" + g_tw + "&h=" + g_th + "&z=" + g_z + "&ts=" + new Date().getTime();
+    var u = "/tile?x=" + x + "&y=" + y + "&w=" + g_tw + "&h=" + g_th + "&z=" + g_z;
+
+    if (g_refresh)
+        u += "&ts=" + new Date().getTime();
+
+    if (g_opt_key && g_opt_value)
+        u += "&" + g_opt_key + "=" + g_opt_value;
+
+    return u;
 }
 
 /*
@@ -449,7 +477,8 @@ function _tile_loaded (t) {
  * Updates the tile to the current time/zoom level
  */
 function touch_tile (tile, col, row) {
-    tile.src = build_url(col, row);
+    if (g_refresh)
+        tile.src = build_url(col, row);
 }
 
 /*
@@ -626,3 +655,56 @@ function vehicle_scroll_to (veh_id) {
 
     check_tiles();
 }
+
+// images stuff
+var g_imgs;
+
+function load_image_list () {
+     new Ajax.Request("/images", {
+        method: 'get',
+        onSuccess: function (transport, images) {
+            g_tw = images[0];
+            g_th = images[1];
+
+            var list = document.createElement("select");
+            list.id = "images_list";
+
+            images[2].each(function(img){
+                var filename = img[0];
+                var zoom_max = img[1];
+
+                var item = document.createElement("option");
+
+                item.value = filename + "/" + zoom_max;
+                item.innerHTML = filename;
+
+                list.appendChild(item);
+            });
+
+            var btn = document.createElement("input");
+            btn.type = "button";
+            btn.value = "View";
+            Event.observe(btn, "click", change_image);
+
+            var zoom = $('zoom');
+            
+            zoom.appendChild(document.createElement("br"));
+            zoom.appendChild(list);
+            zoom.appendChild(btn);
+            
+            change_image();
+        }
+    });
+}
+
+function change_image () {
+    var data = $F("images_list").split("/");
+    
+    var filename = data[0];
+    var zoom_max = parseInt(data[1]);
+
+    // load (x, y, tw, th, z, z_min, z_max, opt_key, opt_value)
+    unload();
+    load(0, 0, g_tw, g_th, zoom_max, 0, zoom_max, "f", filename, false);
+}
+
