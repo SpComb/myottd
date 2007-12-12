@@ -75,7 +75,7 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         self._screenshot_deferred = None
         self.reqs = []
         
-        args=['openttd', '-A', '-D', '192.168.11.11:7199', '-b', '8bpp-simple']
+        args=['openttd', '-A', '-D', '192.168.11.11:7199', '-b', '8bpp-simple', '-g', 'openttdcoop_5.sav']
         reactor.spawnProcess(self, '/home/terom/my_ottd/openttd/trunk/bin/openttd', args=args, path='/home/terom/my_ottd/openttd/trunk/bin/', usePTY=False)
 
     def connectionMade (self) :
@@ -151,8 +151,11 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
 from twisted.web2 import http_headers, http, stream, responsecode, resource
 
 class Tile (resource.Resource) :
-    def __init__ (self, openttd) :
+    def __init__ (self, openttd, cache) :
         self.openttd = openttd
+        self.cache = cache
+    
+    TILE_CACHE_VERSION = 1
 
     def render (self, r) :
         z = int(r.args['z'][0])
@@ -180,12 +183,33 @@ class Tile (resource.Resource) :
             else :
                 x = int(r.args['x'][0])
                 y = int(r.args['y'][0])
+                
+                key = "%d:%d:%d:%d:%d:%d" % (self.TILE_CACHE_VERSION, x, y, w, h, z)
 
-                d = self.openttd.getScreenshot(x, y, w, h, z)
+                log.msg("%s: get" % key)
+
+                d = self.cache.get(key).addCallback(self._gotCache, key, x, y, w, h, z)
 
         d.addCallback(self._respond)
 
         return d
+    
+    def _gotCache (self, (value, flags), key, x, y, w, h, z) :
+        if value :
+            log.msg("%s: hit" % key)
+
+            return value
+        else :
+            log.msg("%s: miss" % key)
+
+            return self.openttd.getScreenshot(x, y, w, h, z).addCallback(self._storeCache, key)
+    
+    def _storeCache (self, value, key) :
+        log.msg("%s: set" % key)
+
+        self.cache.set(key, value, expireTime=10).addErrback(log.err)
+
+        return value
 
     def _respond (self, image_data) :
         return http.Response(
@@ -255,10 +279,18 @@ class VehicleSprite (resource.Resource) :
             },
             stream.MemoryStream(image_data)
         )
+from twisted.internet import protocol, reactor
+from lib import memcache
 
 def startup (root) :
+    log.msg("Connecting to memcached...")
+    protocol.ClientCreator(reactor, memcache.MemCacheProtocol).connectTCP("localhost", memcache.DEFAULT_PORT).addCallback(_gotCache, root)
+
+def _gotCache (cache, root) :
+    log.msg("Got memcached, adding HTTP resource")
+
     ottd = Openttd()
-    root.putChild("tile", Tile(ottd))
+    root.putChild("tile", Tile(ottd, cache))
     root.putChild("vehicles", Vehicles(ottd))
     root.putChild("sprite", VehicleSprite(ottd))
 

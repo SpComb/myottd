@@ -45,7 +45,7 @@ A selection of large images that you can, like, scroll around. Use the dropdown 
             init();
 % if mode == "openttd" :        
             load(${start_col}, ${start_row}, ${tile_width}, ${tile_height}, ${initial_zoom}, ${zoom_min}, ${zoom_max}, null, null, true);
-            vehicle_list();
+            // vehicle_list();
 % elif mode == "image" :
             load_image_list();
 % else :
