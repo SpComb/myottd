@@ -46,11 +46,7 @@ function init () {
     subs = $("substrate");
 
     // were we anchored to some particular location?
-    if (document.baseURI.indexOf("#") >= 0) {
-        g_target = document.baseURI.split("#", 2);
-        g_target = g_target[1];
-    } else
-        g_target = "";
+    g_target = document.location.hash.replace("#", "");
    
     // create the draggable
     g_draggable = new Draggable("substrate", {
@@ -333,9 +329,9 @@ function viewport_mousewheel (e) {
     // delta < 0 : scroll down, zoom out
     delta = delta < 0 ? 1 : -1;
 
-    // Firefox's DOMMouseEvent's pageX/Y attributes are broken
-    var x = parseInt(e.target.style.left) + e.layerX;
-    var y = parseInt(e.target.style.top) + e.layerY;
+    // Firefox's DOMMouseEvent's pageX/Y attributes are broken. layerN is for mozilla, offsetN for IE, seems to work
+    var x = parseInt(e.target.style.left) + (e.layerX ? e.layerX : e.offsetX);
+    var y = parseInt(e.target.style.top) + (e.layerY ? e.layerY : e.offsetY);
     var dx = x - scroll_x();
     var dy = y - scroll_y();
 
@@ -461,7 +457,7 @@ function load_tile (id, col, row) {
     e.style.top = g_th * row;
     e.style.left = g_tw * col;
     e.style.display = "none";
-    e.onload = _tile_loaded;
+    Event.observe(e, "load", _tile_loaded);
     e.__col = col;
     e.__row = row;
 
@@ -469,8 +465,9 @@ function load_tile (id, col, row) {
     g_tiles[g_z].push(e);
 }
 
-function _tile_loaded (t) {
-    t.currentTarget.style.display = null;
+function _tile_loaded (e) {
+    this.style.display = "block";
+
 }
 
 /*

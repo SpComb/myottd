@@ -43,9 +43,10 @@ class ImageCollection (object) :
             
             imgs = []
             for file in files :
-                img = self.getImage(file)
-                
-                imgs.append((file, img.zoom_max))
+                if not os.path.isdir(file) :
+                    img = self.getImage(file)
+                    
+                    imgs.append((file, img.zoom_max))
 
             self.cache.set("%d:images:%s" % (self.IMAGELIST_VERSION, os.stat(self.dir).st_mtime), dump(imgs))
         else :
