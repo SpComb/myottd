@@ -264,7 +264,7 @@ class Config (object) :
 
         self.sections['newgrf'].setitems(newgrfs)
 
-    def applyConfig (self, new_config) :
+    def applyConfig (self, new_config, trusted=False) :
         """
             new_config is a {section.name -> value} dict
         """
@@ -274,7 +274,7 @@ class Config (object) :
         for sectionKey, value in new_config.iteritems() :
             section, key = sectionKey.split('.', 1)
 
-            if (section, '*') in HIDDEN_SETTINGS or (section, key) in HIDDEN_SETTINGS :
+            if not trusted and ((section, '*') in HIDDEN_SETTINGS or (section, key) in HIDDEN_SETTINGS) :
                 continue
 
             cur_value = self.getValue(section, key)

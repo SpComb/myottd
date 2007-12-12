@@ -245,10 +245,11 @@ class Server (protocol.ProcessProtocol) :
 
         self.config.applyConfig(dict([
             ("%s.%s" % (section, key), getattr(self, attr_name)) for (attr_name, section, key) in CONFIG_SETTINGS
-        ]))
+        ]), trusted=True)
         self.config.applyConfig(dict([
             ("%s.%s" % (section, key), value) for (section, key, value) in CONFIG_CONSTANTS
-        ]))
+        ]), trusted=True)
+        
     
     # RPC
     def getConfig (self) :

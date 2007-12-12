@@ -119,6 +119,21 @@ def readMany (i) :
     
     return args
 
+def yieldUntilFalse (func, *args) :
+    """
+        This simply calls func with args, yielding whatever it returns as long
+        as it evaluates to true. Once it returns something that evaluates to
+        False, we stop iterating
+    """
+
+    while True :
+        value = func(*args)
+
+        if value :
+            yield value
+        else :
+            return
+
 def readItem (i) : 
     type = i.read(1)
 
@@ -154,17 +169,7 @@ def readItem (i) :
         raise StopIteration()
 
     elif type == '@' :
-        chunks = []
-
-        while True :
-            chunk = i.readVarLen('B')
-
-            if chunk :
-                chunks.append(chunk)
-            else :
-                break
-        
-        value = ''.join(chunks)
+        value = ''.join(yieldUntilFalse(i.readVarLen, 'B'))
 
     elif type == '!' :
         raise Exception(readItem(i))
