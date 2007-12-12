@@ -314,12 +314,14 @@ function viewport_mousewheel (e) {
     // this works in very weird ways, so it's based on code from http://adomas.org/javascript-mouse-wheel/ (stupid person didn't include any license)
     var delta;
 
-    if (e.wheelData) {  // IE + Opera
-        delta = e.wheelData;
-        if (window.opera)   // Opera
-            delta = -delta;
+    if (e.wheelDelta) {  // IE + Opera
+        delta = e.wheelDelta;
+//        if (window.opera)   // Opera, but apparently not newer versions?
+//            delta = -delta;
     } else if (e.detail) {  // Mozilla
         delta = -e.detail;
+    } else {
+        return;
     }
 
     if (e.preventDefault)
