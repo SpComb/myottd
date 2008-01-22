@@ -102,9 +102,11 @@ function load (x, y, tw, th, z, z_min, z_max, opt_key, opt_value, refresh) {
     
     viewp = $("viewport");
     subs = $("substrate");
-    
+}
+
+function onload () {
     // create the zoom-level divs
-    for (var zl = z_min; zl <= z_max; zl++) {
+    for (var zl = g_z_min; zl <= g_z_max; zl++) {
         zl_div = document.createElement("div");
         zl_div.id = "zl_" + zl;
         zl_div.style.position = "relative";
@@ -115,13 +117,15 @@ function load (x, y, tw, th, z, z_min, z_max, opt_key, opt_value, refresh) {
     }
 
     if (g_target.indexOf("goto") == 0) {
-        asdf = g_target.split("_", 4);
+        var asdf = g_target.split("_", 4);
         
         update_zoom_level(
             parseInt(asdf[3]) - g_z
         );
         
-        scroll_to(
+        update_viewport_size(true);
+
+        scroll_center_to(
             parseInt(asdf[1]),
             parseInt(asdf[2])
         );
@@ -140,9 +144,11 @@ function load (x, y, tw, th, z, z_min, z_max, opt_key, opt_value, refresh) {
         viewport_fullscreen();
     else  {
         // load the viewport size and then the tiles
-        update_viewport_size();
+        update_viewport_size(false);
     }
 }
+
+Event.observe(window, "load", onload);
 
 function unload () {
     $("substrate").innerHTML = "";
@@ -160,14 +166,15 @@ function debug (str) {
 /*
  * update the screen size stuff based on the actual viewport size
  */
-function update_viewport_size () {
+function update_viewport_size (no_load) {
     g_w = viewp.getWidth();
     g_h = viewp.getHeight();
 
-    g_w_half = g_w/2;
-    g_h_half = g_h/2;
-
-    check_tiles();
+    g_w_half = Math.floor(g_w/2);
+    g_h_half = Math.floor(g_h/2);
+    
+    if (!no_load)
+        check_tiles();
 }
 
 function viewport_fullscreen () {
@@ -180,7 +187,7 @@ function viewport_fullscreen () {
     viewp.style.height = "100%";
     viewp.style.borderWidth = 0;
 
-    update_viewport_size();
+    update_viewport_size(false);
 }
 
 // pixel-oriented stuff, related to where the view is scrolled to
@@ -191,6 +198,13 @@ function viewport_fullscreen () {
 function scroll_to (x, y) {
     subs.style.top = "-" + y + "px";
     subs.style.left = "-" + x + "px";
+}
+
+function scroll_center_to (x, y) {
+    return scroll_to(
+        x - g_w_half,
+        y - g_h_half
+    );
 }
 
 /*
@@ -220,13 +234,13 @@ function scroll_y () {
 }
 
 /*
- * scale co-ordinates by a zoom factor, if we zoom in (dz < 0), n will become larger, and if we zoom out (dz > 0), n will become smaller
+ * scale co-ordinates by a zoom factor, if we zoom in (dz > 0), n will become larger, and if we zoom out (dz < 0), n will become smaller
  */
 function scaleByZoomDelta (n, dz) {
     if (dz > 0)
-        return n >> dz;
+        return n << dz;
     else
-        return n << -dz;
+        return n >> -dz;
 }
 
 /*
@@ -297,7 +311,7 @@ function viewport_dblclick (e) {
     if (!zoom_center_to(
         scroll_x() + offset.x,
         scroll_y() + offset.y,
-        -1
+        1
     )) {
         // if we're already zoomed in, move o/
         move(offset.x - g_w_half, offset.y - g_h_half);
@@ -329,7 +343,7 @@ function viewport_mousewheel (e) {
     
     // delta > 0 : scroll up, zoom in
     // delta < 0 : scroll down, zoom out
-    delta = delta < 0 ? 1 : -1;
+    delta = delta < 0 ? -1 : 1;
 
     // Firefox's DOMMouseEvent's pageX/Y attributes are broken. layerN is for mozilla, offsetN for IE, seems to work
     var x = parseInt(e.target.style.left) + (e.layerX ? e.layerX : e.offsetX);
@@ -349,7 +363,6 @@ function viewport_mousewheel (e) {
 
 /*
  * Updates the zoom level with the given delta. Returns true/false if it's valid or not
- * Disable/enable the zoom in/out buttons to reflect the current zoom level and the min/max zoom levels
  */
 function update_zoom_level (delta) {
     var oz = g_z;
@@ -360,17 +373,6 @@ function update_zoom_level (delta) {
         return false;
     
     g_z = z;
-    
-    // update the zoom buttons
-    if (z == g_z_min)
-        $("zoom_in").disable();
-    else
-        $("zoom_in").enable();
-
-    if (z == g_z_max)
-        $("zoom_out").disable();
-    else
-        $("zoom_out").enable();
     
     // now update the zoomlevel div's z-indexes
     zoom_showhide_fillers(true);
@@ -431,10 +433,10 @@ function zoom_showhide_fillers (show) {
  * Return the URL to the given tile, taking the current zoom level into account
  */
 function build_url (col, row) {
-    var x = col*(g_tw << g_z);
-    var y = row*(g_th << g_z);
+    var x = col*g_tw;
+    var y = row*g_th;
 
-    var u = "/tile?x=" + x + "&y=" + y + "&w=" + g_tw + "&h=" + g_th + "&z=" + g_z;
+    var u = "/tile?x=" + x + "&y=" + y + "&w=" + g_tw + "&h=" + g_th + "&z=" + g_z + "&sw=" + g_w + "&sh=" + g_h;
 
     if (g_refresh)
         u += "&ts=" + new Date().getTime();
@@ -513,7 +515,7 @@ function check_tiles () {
     }
 
     // update the link-to-this-page thing
-    $("page_link").href = "#goto_" + x + "_" + y + "_" + g_z;
+    document.location.hash = "#goto_" + (x + g_w_half) + "_" + (y + g_h_half) + "_" + g_z;
 }
 
 // delayed updates
