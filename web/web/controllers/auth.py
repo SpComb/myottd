@@ -24,6 +24,8 @@ class AuthController (BaseController) :
     def login (self, sub_domain=None) :
         user = model.user_login(request.params['username'], request.params['password'])
         
+        print "login_user: %r" % user
+
         if user :
             session['user_id'] = user.id
             session.save()

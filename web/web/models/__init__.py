@@ -37,6 +37,7 @@ users_table = Table('users', metadata,
 openttd_versions_table = Table('openttd_versions', metadata,
     Column('id', Integer, primary_key=True),
     Column('version', String(32)),
+    Column('name', String(32)),
 )
 
 servers_table = Table('servers', metadata,
@@ -158,8 +159,9 @@ def server_create (owner, url, name, version) :
         raise Exception("All ports in use")
 
 def available_versions () :
-    return [(v, id) for v, id in select(
+    return list(select(
         [
+            openttd_versions_table.c.name,
             openttd_versions_table.c.version,
             openttd_versions_table.c.id,
         ],
@@ -167,7 +169,7 @@ def available_versions () :
         order_by=[desc(openttd_versions_table.c.id)],
 
         bind=get_bind()
-    ).execute()]
+    ).execute())
 
 def get_server_id_by_username (username, server_url) :
     res = select(

@@ -50,7 +50,7 @@
 
         <label for="version">Version</label>
         <select name="version">
-            <% h.options_for_select(c.available_versions) %>
+            <% h.options_for_select((h.format_version(name, version), id) for  (name, version, id) in c.available_versions) %>
         </select>
         <br/>
 

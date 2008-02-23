@@ -26,7 +26,7 @@
 
         <label for="version">Version</label>
         <select name="version">
-            <% h.options_for_select(c.available_versions, c.server_info['version_id']) %>
+            <% h.options_for_select(((h.format_version(name, version), id) for (name, version, id) in c.available_versions), c.server_info['version_id']) %>
         </select>
 %   if c.server_info['version_name'] != c.server_info['version'] :
             <span class="current">You must restart for this to take effect</span>

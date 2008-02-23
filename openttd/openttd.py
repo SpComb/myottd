@@ -25,6 +25,8 @@ import cPickle
 
 def applyTypes (vars, *types) :
     ret =  []
+    
+#    print "apply types %s to:\n\t%s" % (types, vars)
 
     for i, t in enumerate(types) :
        v = parseVar(vars[i], t)
@@ -115,7 +117,6 @@ def load_lang (lang_path) :
 # {{"map_x", (const void*)(8), SDT_NUMX, 0, 6, 11, 0, ((void *)0), STR_CONFIG_PATCHES_MAP_X, ((void *)0)}, {SL_VAR, SLE_UINT8 | SLF_SAVE_NO | SLF_NETWORK_NO, 1, 0, 255, (void*)__builtin_offsetof (Patches, map_x)}},
 
 settings_re = re.compile(r"const SettingDesc(?:GlobVarList)? _(.*?)_settings\[\] = \{(.*?)};", re.DOTALL)
-setting_re = re.compile(r"{{(.*?)}, {(.*?)}},")
 
 
 def handle_settings (settings_path, lang) :
@@ -146,13 +147,22 @@ def handle_settings (settings_path, lang) :
         print "Have %d settings" % len(patches)
 
     return patches
-    
+
+sanitize_re = re.compile(r"{([0-9A-Z_]+)}")
+setting_re = re.compile(r"{{(.*?)}, {(.*?)}},")
+
 def handle_block (block_data, patches, block_name, strs) :
     print "Scanning for patches in block %s" % block_name
+    print "Sanitizing nested brackets... (ugh)"
+    
+    block_data = sanitize_re.sub(r"\1", block_data)
 
+    print "block data:\n\t%s" % block_data
     for m in setting_re.finditer(block_data) :
         nsd_spec = m.group(1)
         sleg_spec = m.group(2)
+
+        print "\t nsd: %s\n\tsleg: %s" % (nsd_spec, sleg_spec)
         
         nsd_vars = [v.strip() for v in nsd_spec.split(', ')]
         sleg_vars = [v.strip() for v in sleg_spec.split(', ')]
@@ -269,7 +279,10 @@ def handle_categories (setting_gui_path, patches, lang) :
         for mo in re.finditer(""""(.*?)",""", patches_raw) :
             patch_name = mo.group(1)
 
-            l.append(patches.pop(patch_name))
+            if patch_name in patches :
+                l.append(patches.pop(patch_name))
+            else :
+                print "skip %s, not found" % patch_name
         
         ret.append((cat_name, l))
     
@@ -344,13 +357,25 @@ def save_patch_info (path, patch_info, diff_settings, diff_levels) :
     cPickle.dump((patch_info, diff_settings, diff_levels), fh)
     fh.close()
 
-def main (version) :
+def main (version, legacy) :
     print "Handling OpenTTD version %s" % version
     
-    lang, next = load_lang(os.path.join(version, "lang", "english.txt"))
-    patches = handle_settings(os.path.join(version, "settings.cpp"), lang)
-    categories = handle_categories(os.path.join(version, "settings_gui.c"), patches, lang)
-    diff_settings, diff_levels = calc_difficulties(os.path.join(version, "settings_gui.c"), lang, next)
+    if legacy :
+        print "Using legacy paths..."
+        lang_path = os.path.join(version, "lang", "english.txt")
+        settings_path = os.path.join(version, "settings.c")
+        settings_gui_path = os.path.join(version, "settings_gui.c")
+        info_path = os.path.join(version, "cfg_info.dat")
+    else :
+        lang_path = os.path.join(version, "src", "lang", "english.txt")
+        settings_path = os.path.join(version, "src", "settings.cpp")
+        settings_gui_path = os.path.join(version, "src", "settings_gui.cpp")
+        info_path = os.path.join(version, "bin", "cfg_info.dat")
+
+    lang, next = load_lang(lang_path)
+    patches = handle_settings(settings_path, lang)
+    categories = handle_categories(settings_gui_path, patches, lang)
+    diff_settings, diff_levels = calc_difficulties(settings_gui_path, lang, next)
     
     for name, patches in categories :
         print "%s:" % name
@@ -365,15 +390,23 @@ def main (version) :
         for value in value_names :
             print "\t%s" % value
 
-    save_patch_info(os.path.join(version, "cfg_info.dat"), categories, diff_settings, diff_levels)
+    save_patch_info(info_path, categories, diff_settings, diff_levels)
 
 if __name__ == '__main__' :
     from sys import argv
 
     argv.pop(0)
 
+    legacy = False
+
+    if len(argv) > 1 :
+        if argv[1] == "--legacy" :
+            legacy = True
+        else :
+            print "Unknown argument '%s'" % argv[1]
+
     if argv :
-        main(argv[0])
+        main(argv[0], legacy)
     else :
         print "specify the name of the new OpenTTD version as a command-line argument"
 

@@ -83,3 +83,9 @@ def fmtMoney (money) :
 def mapSize2value (size) :
     return int(math.log(size, 2))
 
+def format_version (name, version) :
+    if name :
+        return "%s (%s)" % (name, version)
+    else :
+        return version
+
