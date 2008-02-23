@@ -198,7 +198,7 @@ class Config (object) :
         elif type == 'intlist' :
             length = type_data
             
-            if len(value) != length :
+            if length != -1 and len(value) != length :
                 raise ValueError("Intlist %r for '%s.%s' is the wrong length (should be %d)" % (value, sectionName, key, length))
             else :
                 for item in value :

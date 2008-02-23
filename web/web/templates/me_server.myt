@@ -76,7 +76,7 @@
     <form action="<% h.url_for('admin_server_newrandom', id=c.server_id) %>" method="POST">
         <label for="gameopt.landscape">Climate</label>
         <select name="gameopt.landscape">
-            <% h.options_for_select(h.climate_opts, c.server_info['map_type']) %>
+            <% h.options_for_select(c.server_info['landscape_types'], c.server_info['map_type']) %>
         </select>
         <br/>
 
@@ -190,6 +190,16 @@
     <input type="submit" value="Upload" />
 
     </form>
+</fieldset>
+
+<fieldset>
+    <legend>Console Output</legend>
+
+    <pre>
+%   for line in s['console_output'] :
+<% line | h %>
+%   # end for
+    </pre>
 </fieldset>
 % # end if
 

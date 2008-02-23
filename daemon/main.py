@@ -21,6 +21,7 @@ import os
 import os.path
 import shutil
 from datetime import date
+from collections import deque
 import re
 import cPickle
 import time
@@ -155,6 +156,9 @@ class Server (protocol.ProcessProtocol) :
 
         # cached values of various OpenTTD variables
         self._var_cache = {}
+
+        # last lines of console output
+        self.console_output = deque()
 
         # the config
         self.config = config.Config(self)
@@ -337,15 +341,23 @@ class Server (protocol.ProcessProtocol) :
         """
             Got a line of text on the console
         """
+        
+        llow = line.lower()
 
         if self.cmd_deferred :
             if line == self.cmd_delim :
                 self._cmdOver()
             else :
                 self.reply_buffer.append(line)
-        elif line.startswith('dbg: [NET][UDP] Queried from') :
+        elif llow.startswith('dbg: [net] [udp] queried from') or llow.startswith('dbg: [net] [udp] newgrf data request from') \
+          or llow.startswith('dbg: [net][udp] queried from')  or llow.startswith('dbg: [net][udp] newgrf data request from') :
             pass
         else :
+            self.console_output.append(line)
+
+            if len(self.console_output) > 20 :
+                self.console_output.popleft()
+
             # handle events later, perhaps
             self.log("event: %s" % line)
             
@@ -915,6 +927,8 @@ class Server (protocol.ProcessProtocol) :
     def _rpcGetAdmin_gotDetails (self, info) :
         info.update(dict(
             games                   = self.getSavegameInfo(),
+            console_output          = list(self.console_output),
+            landscape_types         = self.config.value_types["gameopt.landscape"][1][1],
         ))
 
         info['newgrf_path'], info['newgrf_config'] = self.getNewgrfConfig()
