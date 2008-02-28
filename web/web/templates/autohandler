@@ -50,7 +50,7 @@
             </div>
             <div id='footer'>
                 <p><strong>MyOTTD</strong> is an OpenTTD dedicated server hosting service. You can create and manage an OpenTTD server from your web browser, and play on it like on any other OpenTTD server.<p>
-                <p>MyOTTD is currently in alpha phase and under development. The current code works somewhat but hasn't been touched for a while and has various issues. Work is under way on prototype code for a fairly extensive rewrite - preview some prototype features at <a href="http://dev.myottd.net:8119/">dev.myottd.net</a></p>
+                <p>MyOTTD is currently in alpha phase and under development. The current <a href="http://trac.meta.myottd.net/">code</a> works somewhat but hasn't been touched for a while and has various issues. Work is under way on prototype code for a fairly extensive rewrite - preview some prototype features at <a href="http://dev.myottd.net:8119/">dev.myottd.net</a></p>
             </div>
         </div>
     </body>

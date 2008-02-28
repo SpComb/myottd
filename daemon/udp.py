@@ -212,18 +212,19 @@ class Poller (protocol.DatagramProtocol) :
         reactor.listenUDP(0, self)
 
     def datagramReceived (self, data, (host, port)) :
-        self.log("%d bytes from %s:%s", len(data), host, port)
+#        self.log("%d bytes from %s:%s", len(data), host, port)
 
         if (host, port) in self.requests :
             type, d = self.requests.pop((host, port))
 
-            self.log("is a reply to a %s query" % type)
+#            self.log("is a reply to a %s query" % type)
 
             type_func = getattr(self, 'got_%s' % type)
 
             type_func(data, d, (host, port))
         else :
-            self.log("no request, ignoring")
+            pass
+#            self.log("no request, ignoring")
 
     def deferred (self, type, host, port, timeout, addHostPort=True) :
         d = defer.Deferred()
@@ -246,7 +247,7 @@ class Poller (protocol.DatagramProtocol) :
         return host, port, None
 
     def getInfo (self, host, port) :
-        self.log("sending info query to %s:%s", host, port)
+#        self.log("sending info query to %s:%s", host, port)
 
         req = c.Container(type='UDP_CLIENT_FIND_SERVER', size=3)
         self.transport.write(Header.build(req), (host, port))
@@ -262,11 +263,11 @@ class Poller (protocol.DatagramProtocol) :
         if self.masterserver_addr :
             return self._getServers_haveAddr(self.masterserver_addr)
         else :
-            self.log("resolving masterserver address...")
+#            self.log("resolving masterserver address...")
             return reactor.resolve(MASTER_SERVER_HOST).addCallback(self._getServers_haveAddr)
 
     def _getServers_haveAddr (self, host) :
-        self.log("getting server list from masterserver (%s)", host)
+#        self.log("getting server list from masterserver (%s)", host)
 
         req = c.Container(type='UDP_CLIENT_GET_LIST', size=3)
         self.transport.write(Header.build(req), (host, MASTER_SERVER_PORT))
@@ -279,7 +280,7 @@ class Poller (protocol.DatagramProtocol) :
         d.callback(servers)
 
     def getDetails (self, host, port) :
-        self.log("sending details query to %s:%s", host, port)
+#        self.log("sending details query to %s:%s", host, port)
 
         req = c.Container(type='UDP_CLIENT_DETAIL_INFO', size=3)
         self.transport.write(Header.build(req), (host, port))
@@ -292,7 +293,7 @@ class Poller (protocol.DatagramProtocol) :
         d.callback((host, port, details))
 
     def getNewGrfs (self, host, port, grf_list) :
-        self.log("sending newgrfs query to %s:%s for: %s", host, port, ' '.join([grf.grfid for grf in grf_list]))
+#        self.log("sending newgrfs query to %s:%s for: %s", host, port, ' '.join([grf.grfid for grf in grf_list]))
 
         header = c.Container(type='UDP_CLIENT_GET_NEWGRFS', size=4+(20)*len(grf_list))
         req = c.Container(header=header, newgrf_count=len(grf_list), newgrfs=grf_list)

@@ -25,6 +25,7 @@ import web.models as model
 import web.lib.helpers as h
 from web.lib import rpc, settings
 import sqlalchemy.exceptions
+import traceback as _traceback
 
 class BaseController(WSGIController):
     def __before__ (self) :
@@ -40,15 +41,19 @@ class BaseController(WSGIController):
         else :
             c.view_user = False
 
-        print "sub_domain:", c.sub_domain
-        print "auth_user:", c.auth_user
-        print "view_user:", c.view_user
-
     def __call__(self, environ, start_response):
         # Insert any code to be run per request here. The Routes match
         # is under environ['pylons.routes_dict'] should you want to check
         # the action or route vars here
-        return WSGIController.__call__(self, environ, start_response)
+
+        try :
+            return WSGIController.__call__(self, environ, start_response)
+        except Exception, e :
+            c.error_title = "Generic Internal Error :("
+            c.error = "%s: %s" % (e.__class__.__name__, e)
+            c.traceback = _traceback.format_exc()
+
+            return render_response('error.myt')
 
 @decorator
 def form_handler (func, *args, **kwargs) :
@@ -118,7 +123,6 @@ def _my_create_id (self) :
         
         self.request.headers_out.add('set-cookie', self.cookie[self.key].output(header=''))
         
-        print "--- headers: ", repr(self.request.headers_out.headers)
 Session._create_id = _my_create_id
 
 # Include the '_' function in the public names

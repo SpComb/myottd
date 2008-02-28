@@ -170,6 +170,7 @@ class Server (protocol.ProcessProtocol) :
 
     def log (self, msg) :
         print '%d: %s' % (self.id, msg)
+        self.console_write(" * %s" % msg)
 
     def start (self, savegame=None) :
         """
@@ -336,6 +337,13 @@ class Server (protocol.ProcessProtocol) :
             line, data = data.split('\r\n', 1)
 
             self.lineReceived(line)
+    
+    def console_write (self, line) :
+        self.console_output.append(line)
+
+        if len(self.console_output) > 50 :
+            self.console_output.popleft()
+       
 
     def lineReceived (self, line) :
         """
@@ -353,13 +361,10 @@ class Server (protocol.ProcessProtocol) :
           or llow.startswith('dbg: [net][udp] queried from')  or llow.startswith('dbg: [net][udp] newgrf data request from') :
             pass
         else :
-            self.console_output.append(line)
-
-            if len(self.console_output) > 20 :
-                self.console_output.popleft()
+            self.console_write(line)
 
             # handle events later, perhaps
-            self.log("event: %s" % line)
+#            self.log("event: %s" % line)
             
     def processEnded (self, reason) :
         """

@@ -22,7 +22,7 @@ DATABASE_USER = "my_ottd"
 DATABASE_PASSWD = "OohoopoopahYi4ei"
 DATABASE_NAME = "my_ottd"
 
-PORT_MIN = 7100
-PORT_MAX = 7200
+PORTS = [p for p in xrange(7100, 7400)]
 
 RPC_PORT = 5830
+

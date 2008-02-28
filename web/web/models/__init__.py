@@ -145,9 +145,7 @@ def server_create (owner, url, name, version) :
 
     ports = [p for p, in select([servers_table.c.port], order_by=[asc(servers_table.c.port)], bind=get_bind()).execute()]
     
-    print "ports:", ports
-
-    for port in xrange(settings.PORT_MIN, settings.PORT_MAX) :
+    for port in settings.PORTS :
         if port not in ports :
             s.port = port
             break
