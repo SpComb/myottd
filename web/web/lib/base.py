@@ -26,6 +26,7 @@ import web.lib.helpers as h
 from web.lib import rpc, settings
 import sqlalchemy.exceptions
 import traceback as _traceback
+import paste.httpexceptions as _httpexceptions
 
 class BaseController(WSGIController):
     def __before__ (self) :
@@ -49,6 +50,9 @@ class BaseController(WSGIController):
         try :
             return WSGIController.__call__(self, environ, start_response)
         except Exception, e :
+            if isinstance(e, _httpexceptions.HTTPFound) :
+                raise
+
             c.error_title = "Generic Internal Error :("
             c.error = "%s: %s" % (e.__class__.__name__, e)
             c.traceback = _traceback.format_exc()

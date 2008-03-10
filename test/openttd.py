@@ -75,8 +75,8 @@ class Openttd (rpc2.RPCProtocol, protocol.ProcessProtocol) :
         self._screenshot_deferred = None
         self.reqs = []
         
-        args=['openttd', '-A', '-D', '192.168.11.11:7199', '-b', '8bpp-simple', '-g', 'openttdcoop_5.sav']
-        reactor.spawnProcess(self, '/home/terom/my_ottd/openttd/trunk/bin/openttd', args=args, path='/home/terom/my_ottd/openttd/trunk/bin/', usePTY=False)
+        args=['openttd', '-A', '-D', '192.168.1.11:7099', '-b', '8bpp-simple', '-g', 'pvl_1-1.sav']
+        reactor.spawnProcess(self, '/home/terom/my_ottd/test/openttd/bin/openttd', args=args, path='/home/terom/my_ottd/test/openttd/bin/', usePTY=False)
 
     def connectionMade (self) :
         log.msg("OpenTTD running...")

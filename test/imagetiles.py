@@ -59,9 +59,6 @@ root = Root()
 root.putChild("static", static.File("static/"))
 site = server.Site(root)
 
-# direct HTTP
-chan = channel.HTTPFactory(site)
-
 from sys import argv
 
 import openttd
@@ -69,16 +66,19 @@ import image
 
 if 'mode_openttd.py' in argv :
     mode = openttd
-    port = 'tcp:8119'
+    http_port = 'tcp:8119'
+    fcgi_port = 'tcp:6531'
 elif 'mode_images.py' in argv :
     mode = image
-    port = 'tcp:8118'
+    http_port = 'tcp:8118'
+    fcgi_port = 'tcp:6532'
 else :
     mode = None
 
-# FastCGI
-#chan = channel.FastCGIFactory(site)
-#port = 'tcp:6531'
+#chan = channel.HTTPFactory(site)
+#port = http_port
+chan = channel.FastCGIFactory(site)
+port = fcgi_port
 
 from twisted.application import service, strports
 application = service.Application("imagetiles")

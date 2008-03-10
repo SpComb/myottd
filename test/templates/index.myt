@@ -24,7 +24,7 @@
             <div id="help">
                 <p>
 % if mode == "openttd" :                
-A view into a real OpenTTD game. View updates when you drag the map. Join the OpenTTD server at <strong>myottd.net:7199</strong>.
+A view into a real OpenTTD game. View updates when you drag the map. Join the OpenTTD server at <strong>myottd.net:7099</strong>.
 % elif mode == "image" :
 A selection of large images that you can, like, scroll around. Use the dropdown below the viewport to select the image to view
 % endif
