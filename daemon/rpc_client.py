@@ -22,7 +22,9 @@ import pprint
 import settings
 
 def invoke (cmd, **args) :
-    fh = urllib.urlopen("http://localhost:%d/%s?%s" % (settings.RPC_PORT, cmd, urllib.urlencode(args)))
+    url = "http://localhost:%d/%s?%s" % (settings.RPC_PORT, cmd, urllib.urlencode(args))
+    print url
+    fh = urllib.urlopen(url)
     obj = simplejson.load(fh)
     fh.close()
 

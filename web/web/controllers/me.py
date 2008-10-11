@@ -80,6 +80,9 @@ class MeController (BaseController) :
         elif action == 'Restart' :
             rpc.invoke('restart', id=id)
 
+        elif action == 'Enable' :
+            enabled = True
+
         elif action == 'Apply' :
             rpc.invoke('apply', 
                 id          = id,

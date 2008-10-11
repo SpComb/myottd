@@ -61,6 +61,12 @@
 
         <input type="submit" name="action" value="Restart" />
         <br/>
+
+%   if not c.admin_server.enabled :
+        <strong>Server is disabled: </strong>
+        <input type="submit" name="action" value="Enable" />
+        <br/>
+%   # end if        
 % else :
         <input type="submit" name="action" value="Start" />
         <br/>
